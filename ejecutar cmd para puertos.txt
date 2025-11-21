@@ -1,0 +1,6 @@
+primero entrar a local "C:\Users\[usuario]\AppData\Local\Android\Sdk\platform-tools" entrar con Win + R luego appdata -> Local -> Android -> Sdk -> plataform-tools -> Luego ejecutar el CMD en esa carpeta
+
+adb reverse tcp:8081 tcp:8081
+adb reverse tcp:8082 tcp:8082
+adb reverse tcp:8083 tcp:8083
+adb reverse tcp:8084 tcp:8084
