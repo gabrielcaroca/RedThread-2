@@ -1,0 +1,47 @@
+server:
+  port: 8082
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rt_catalog
+    username: postgres
+    password: 123
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc.lob.non_contextual_creation: true
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  servlet:
+    multipart:
+      max-file-size: 20MB       # tamaño máximo permitido por archivo
+      max-request-size: 20MB    # tamaño máximo permitido por request
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.security.oauth2: DEBUG
+
+management:
+  endpoints:
+    web:
+      base-path: /actuator
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+app:
+  media:
+    upload-dir: ./uploads         # carpeta local donde se guardan las imágenes
+    public-prefix: /media         # prefijo público para servir imágenes
+  security:
+    jwt:
+      secret: 8bc5013076fe8a59ccb4ad731e17b757002f0f07588444d66bb95b8c4d32b4e1

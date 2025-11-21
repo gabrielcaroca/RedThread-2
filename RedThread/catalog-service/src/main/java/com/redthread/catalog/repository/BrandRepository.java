@@ -1,0 +1,18 @@
+package com.redthread.catalog.repository;
+
+import com.redthread.catalog.model.*;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface BrandRepository extends JpaRepository<Brand, Long> {
+    Optional<Brand> findByNameIgnoreCase(String name);
+}
+
+
+
+
+
+
+
+
+

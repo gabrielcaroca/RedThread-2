@@ -1,0 +1,49 @@
+server:
+  port: 8084
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/rt_delivery
+    username: postgres
+    password: 123
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc.lob.non_contextual_creation: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  security:
+    jwt:
+      secret: 8bc5013076fe8a59ccb4ad731e17b757002f0f07588444d66bb95b8c4d32b4e1
+  order:
+    base-url: http://localhost:8083
+  catalog:
+    base-url: http://localhost:8082
+  http:
+    connect-timeout-ms: 4000
+    read-timeout-ms: 8000
+  rates:
+    default-base: 2990       # tarifa flat si no matchea zona
+  webhook:
+    enabled: false           # si true: intenta notificar al order-service
+
+logging:
+  level:
+    org.springframework.security: INFO
+    com.redthread.delivery: INFO

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <style name="Theme.RedThread" parent="Theme.Material3.DayNight.NoActionBar">
+        <!-- Requisito para edge-to-edge -->
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+
+        <!-- Status bar transparente (sin franja) -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+
+        <!-- Si de verdad quieres todo edge-to-edge, también transparente abajo -->
+        <!-- <item name="android:navigationBarColor">@android:color/transparent</item> -->
+
+        <!-- Si prefieres nav bar negra, deja tu línea actual -->
+        <item name="android:navigationBarColor">@color/black</item>
+
+        <!-- Permitir usar área del notch -->
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+
+        <!-- (Opcional) Desactiva forzado de tema oscuro automático si te ensucia colores -->
+        <!-- <item name="android:forceDarkAllowed">false</item> -->
+    </style>
+
+
+
+</resources>
