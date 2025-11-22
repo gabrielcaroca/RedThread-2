@@ -18,6 +18,7 @@ object AuthStorage {
     private val KEY_EMAIL = stringPreferencesKey("reg_email")
     private val KEY_PASS  = stringPreferencesKey("reg_pass")
     private val KEY_LOGGED = booleanPreferencesKey("logged_in")
+    private val KEY_TOKEN = stringPreferencesKey("access_token")
 
     // guarda registro local (nombre, email, pass)
     suspend fun saveRegisteredUser(ctx: Context, name: String, email: String, pass: String) {
@@ -72,6 +73,26 @@ object AuthStorage {
             // puedes dejar NAME/EMAIL. Si no, descomenta para limpiar todo
             // prefs.remove(KEY_NAME)
             // prefs.remove(KEY_EMAIL)
+        }
+    }
+    suspend fun saveToken(ctx: Context, token: String) {
+        val app = ctx.applicationContext
+        app.dataStore.edit { prefs ->
+            prefs[KEY_TOKEN] = token
+        }
+    }
+
+    suspend fun getToken(ctx: Context): String? {
+        val app = ctx.applicationContext
+        return app.dataStore.data.map { prefs ->
+            prefs[KEY_TOKEN]
+        }.first()
+    }
+
+    suspend fun clearToken(ctx: Context) {
+        val app = ctx.applicationContext
+        app.dataStore.edit { prefs ->
+            prefs.remove(KEY_TOKEN)
         }
     }
 }

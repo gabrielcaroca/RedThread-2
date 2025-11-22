@@ -10,23 +10,13 @@ import androidx.navigation.compose.rememberNavController
 import com.example.redthread.navigation.AppNavGraph
 import com.example.redthread.ui.rememberAuthViewModel
 import com.example.redthread.ui.theme.RedThreadTheme
-import com.example.redthread.data.local.database.AppDatabase
-import com.example.redthread.data.repository.UserRepository
 
 class MainActivity : ComponentActivity() {
 
     private fun setupEdgeToEdge() {
-        // Dibuja contenido detrás de las system bars (status/nav)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-
-        // Mantenemos la status bar visible pero transparente (definido en el tema).
-        // Como tu TopBar es oscuro, dejamos íconos claros (false).
         val controller = WindowInsetsControllerCompat(window, window.decorView)
-        controller.isAppearanceLightStatusBars = false  // iconos claros (fondo oscuro)
-        // Si quisieras iconos oscuros (fondo claro): controller.isAppearanceLightStatusBars = true
-
-        // La nav bar puede quedar negra (coincide con tu tema).
-        // El color ya lo define el tema, no forzamos nada aquí.
+        controller.isAppearanceLightStatusBars = false
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,11 +25,10 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             RedThreadTheme {
-                val db = AppDatabase.getInstance(applicationContext)
-                val userDao = db.userDao()
-                val userRepository = UserRepository(userDao)
-                val authVm = rememberAuthViewModel(userRepository)
                 val navController = rememberNavController()
+
+                // AQUÍ ES DONDE SE ARREGLA TODO
+                val authVm = rememberAuthViewModel()
 
                 AppNavGraph(
                     navController = navController,

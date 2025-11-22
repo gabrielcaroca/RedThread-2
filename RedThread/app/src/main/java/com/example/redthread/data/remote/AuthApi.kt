@@ -1,30 +1,27 @@
 package com.example.redthread.data.remote
 
+import com.example.redthread.data.remote.dto.AuthResponse
+import com.example.redthread.data.remote.dto.LoginRequest
+import com.example.redthread.data.remote.dto.RegisterRequest
+import com.example.redthread.data.remote.dto.UserProfileDto
+import retrofit2.Response
 import retrofit2.http.Body
+import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 
 interface AuthApi {
 
-    @POST("api/auth/register")
+    @POST("auth/register")
     suspend fun register(@Body req: RegisterRequest): AuthResponse
 
-    @POST("api/auth/login")
+    @POST("auth/login")
     suspend fun login(@Body req: LoginRequest): AuthResponse
+
+    @GET("me")
+    suspend fun me(@Header("Authorization") token: String): UserProfileDto
+
+    // 🔥 Usamos /auth/reset-password (NO /confirm)
+    @POST("auth/reset-password")
+    suspend fun resetPassword(@Body body: Map<String, String>): Response<Void>
 }
-
-data class RegisterRequest(
-    val email: String,
-    val password: String,
-    val nombre: String
-)
-
-data class LoginRequest(
-    val email: String,
-    val password: String
-)
-
-data class AuthResponse(
-    val accessToken: String,
-    val userId: Long,
-    val roles: List<String>
-)

@@ -3,13 +3,11 @@ package com.example.redthread.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.redthread.data.local.SessionPrefs
-import com.example.redthread.data.repository.UserRepository
+import com.example.redthread.data.repository.AuthRepository
 import com.example.redthread.domain.validation.validateConfirm
 import com.example.redthread.domain.validation.validateEmail
 import com.example.redthread.domain.validation.validateNameLettersOnly
-import com.example.redthread.domain.validation.validatePhoneDigitsOnly
 import com.example.redthread.domain.validation.validateStrongPassword
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -31,12 +29,10 @@ data class LoginUiState(
 data class RegisterUiState(
     val name: String = "",
     val email: String = "",
-    val phone: String = "",
     val pass: String = "",
     val confirm: String = "",
     val nameError: String? = null,
     val emailError: String? = null,
-    val phoneError: String? = null,
     val passError: String? = null,
     val confirmError: String? = null,
     val isSubmitting: Boolean = false,
@@ -53,7 +49,7 @@ data class AuthHeaderState(
 )
 
 class AuthViewModel(
-    private val repository: UserRepository,
+    private val authRepo: AuthRepository,
     private val session: SessionPrefs
 ) : ViewModel() {
 
@@ -74,12 +70,17 @@ class AuthViewModel(
                 session.userEmailFlow,
                 session.userRoleFlow
             ) { logged, name, email, role ->
-                AuthHeaderState(isLoggedIn = logged, displayName = name, email = email, role = role)
+                AuthHeaderState(
+                    isLoggedIn = logged,
+                    displayName = name,
+                    email = email,
+                    role = role
+                )
             }.collectLatest { _header.value = it }
         }
     }
 
-    // -------- LOGIN --------
+    // -------------------- LOGIN --------------------
     fun onLoginEmailChange(value: String) {
         _login.update { it.copy(email = value, emailError = validateEmail(value)) }
         recomputeLoginCanSubmit()
@@ -102,31 +103,46 @@ class AuthViewModel(
 
         viewModelScope.launch {
             _login.update { it.copy(isSubmitting = true, errorMsg = null, success = false) }
-            delay(300)
 
-            val result = repository.login(s.email.trim(), s.pass)
+            val result = authRepo.login(s.email.trim(), s.pass.trim())
 
-            _login.update {
-                if (result.isSuccess) {
-                    val user = result.getOrNull()
+            if (result.isSuccess) {
+                val loginResponse = result.getOrNull()
+                val rawToken = loginResponse?.accessToken
 
-                    // ✅ Guarda el rol real del usuario desde SQLite
-                    viewModelScope.launch {
-                        session.setSession(
-                            logged = true,
-                            email = user?.email ?: s.email.trim(),
-                            name = user?.name,
-                            userId = user?.id?.toString(),
-                            role = user?.role?.name ?: "USUARIO" // ✅ aquí está corregido
+                // Token Manual para evitar Race Condition
+                val me = authRepo.me(tokenManual = rawToken)
+
+                if (me.isSuccess) {
+                    val profile = me.getOrNull()
+
+                    session.setSession(
+                        logged = true,
+                        email = profile?.email,
+                        name = profile?.fullName,
+                        userId = profile?.id?.toString(),
+                        // ✅ CORREGIDO: Quitamos .key porque ahora roles es List<String>
+                        role = profile?.roles?.firstOrNull() ?: "CLIENTE"
+                    )
+                } else {
+                    _login.update {
+                        it.copy(
+                            isSubmitting = false,
+                            success = false,
+                            errorMsg = "No se pudo obtener el perfil"
                         )
                     }
+                    return@launch
+                }
 
-                    it.copy(isSubmitting = false, success = true, errorMsg = null)
-                } else {
+                _login.update { it.copy(isSubmitting = false, success = true) }
+
+            } else {
+                _login.update {
                     it.copy(
                         isSubmitting = false,
                         success = false,
-                        errorMsg = result.exceptionOrNull()?.message ?: "Error de autenticación"
+                        errorMsg = "Correo o contraseña incorrectos"
                     )
                 }
             }
@@ -137,7 +153,7 @@ class AuthViewModel(
         _login.update { it.copy(success = false, errorMsg = null) }
     }
 
-    // -------- REGISTER --------
+    // -------------------- REGISTER --------------------
     fun onNameChange(value: String) {
         val filtered = value.filter { it.isLetter() || it.isWhitespace() }
         _register.update { it.copy(name = filtered, nameError = validateNameLettersOnly(filtered)) }
@@ -146,12 +162,6 @@ class AuthViewModel(
 
     fun onRegisterEmailChange(value: String) {
         _register.update { it.copy(email = value, emailError = validateEmail(value)) }
-        recomputeRegisterCanSubmit()
-    }
-
-    fun onPhoneChange(value: String) {
-        val digitsOnly = value.filter { it.isDigit() }
-        _register.update { it.copy(phone = digitsOnly, phoneError = validatePhoneDigitsOnly(digitsOnly)) }
         recomputeRegisterCanSubmit()
     }
 
@@ -166,10 +176,28 @@ class AuthViewModel(
         recomputeRegisterCanSubmit()
     }
 
+    suspend fun resetPasswordByEmailOrPhone(identifier: String, newPass: String): Boolean {
+        return authRepo.resetPassword(identifier, newPass)
+    }
+
+    fun clearRegisterResult() {
+        _register.update {
+            it.copy(
+                success = false,
+                isSubmitting = false,
+                errorMsg = null
+            )
+        }
+    }
+
     private fun recomputeRegisterCanSubmit() {
         val s = _register.value
-        val noErrors = listOf(s.nameError, s.emailError, s.phoneError, s.passError, s.confirmError).all { it == null }
-        val filled = s.name.isNotBlank() && s.email.isNotBlank() && s.phone.isNotBlank() && s.pass.isNotBlank() && s.confirm.isNotBlank()
+        val noErrors = listOf(s.nameError, s.emailError, s.passError, s.confirmError).all { it == null }
+        val filled = s.name.isNotBlank() &&
+                s.email.isNotBlank() &&
+                s.pass.isNotBlank() &&
+                s.confirm.isNotBlank()
+
         _register.update { it.copy(canSubmit = noErrors && filled) }
     }
 
@@ -179,73 +207,46 @@ class AuthViewModel(
 
         viewModelScope.launch {
             _register.update { it.copy(isSubmitting = true, errorMsg = null, success = false) }
-            delay(400)
 
-            val result = repository.register(
-                name = s.name.trim(),
+            val result = authRepo.register(
+                fullName = s.name.trim(),
                 email = s.email.trim(),
-                phone = s.phone.trim(),
-                password = s.pass
+                password = s.pass.trim()
             )
 
-            _register.update {
-                if (result.isSuccess) {
-                    // ✅ Todos los nuevos usuarios son USUARIO
-                    viewModelScope.launch {
-                        session.setSession(
-                            logged = true,
-                            email = s.email.trim(),
-                            name = s.name.trim(),
-                            userId = null,
-                            role = "USUARIO"
-                        )
-                    }
+            if (result.isSuccess) {
+                val regResponse = result.getOrNull()
+                val rawToken = regResponse?.accessToken
 
-                    it.copy(isSubmitting = false, success = true, errorMsg = null)
-                } else {
+                val me = authRepo.me(tokenManual = rawToken)
+
+                if (me.isSuccess) {
+                    val profile = me.getOrNull()
+                    session.setSession(
+                        logged = true,
+                        email = profile?.email ?: s.email.trim(),
+                        name = profile?.fullName ?: s.name.trim(),
+                        userId = profile?.id?.toString(),
+                        // ✅ CORREGIDO: Quitamos .key aquí también
+                        role = profile?.roles?.firstOrNull() ?: "CLIENTE"
+                    )
+                }
+
+                _register.update { it.copy(isSubmitting = false, success = true) }
+
+            } else {
+                _register.update {
                     it.copy(
                         isSubmitting = false,
                         success = false,
-                        errorMsg = result.exceptionOrNull()?.message ?: "No se pudo registrar"
+                        errorMsg = "No se pudo registrar"
                     )
                 }
             }
         }
     }
-    // === OLVIDÉ MI CONTRASEÑA ===
-    // Actualiza la contraseña buscando por email o por teléfono.
-    // Devuelve true si encontró un usuario y pudo actualizar; false si no existe.
-    suspend fun resetPasswordByEmailOrPhone(identifier: String, newPassword: String): Boolean {
-        val id = identifier.trim()
-        return try {
-            if (id.contains("@")) {
-                // por email
-                val user = repository.getUserByEmail(id) // agrega estos helpers en tu UserRepository si aún no existen
-                if (user != null) {
-                    repository.updatePasswordByEmail(id, newPassword)
-                    true
-                } else false
-            } else {
-                // por teléfono
-                val user = repository.getUserByPhone(id)
-                if (user != null) {
-                    repository.updatePasswordByPhone(id, newPassword)
-                    true
-                } else false
-            }
-        } catch (_: Exception) {
-            false
-        }
-    }
 
-    fun clearRegisterResult() {
-        _register.update { it.copy(success = false, errorMsg = null) }
-    }
-
-    // -------- LOGOUT --------
     fun logout() {
-        viewModelScope.launch {
-            session.clearSession()
-        }
+        viewModelScope.launch { session.clearSession() }
     }
 }

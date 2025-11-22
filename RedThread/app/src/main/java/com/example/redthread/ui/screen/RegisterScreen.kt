@@ -12,7 +12,6 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Person
-import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -55,13 +54,13 @@ fun RegisterScreenVm(
     RegisterScreen(
         name = state.name,
         email = state.email,
-        phone = state.phone,
+        // phone eliminado
         pass = state.pass,
         confirm = state.confirm,
 
         nameError = state.nameError,
         emailError = state.emailError,
-        phoneError = state.phoneError,
+        // phoneError eliminado
         passError = state.passError,
         confirmError = state.confirmError,
 
@@ -71,7 +70,7 @@ fun RegisterScreenVm(
 
         onNameChange = vm::onNameChange,
         onEmailChange = vm::onRegisterEmailChange,
-        onPhoneChange = vm::onPhoneChange,
+        // onPhoneChange eliminado
         onPassChange = vm::onRegisterPassChange,
         onConfirmChange = vm::onConfirmChange,
 
@@ -80,17 +79,16 @@ fun RegisterScreenVm(
     )
 }
 
+
 // ===== UI (scrollable) =====
 @Composable
 private fun RegisterScreen(
     name: String,
     email: String,
-    phone: String,
     pass: String,
     confirm: String,
     nameError: String?,
     emailError: String?,
-    phoneError: String?,
     passError: String?,
     confirmError: String?,
     canSubmit: Boolean,
@@ -98,7 +96,6 @@ private fun RegisterScreen(
     errorMsg: String?,
     onNameChange: (String) -> Unit,
     onEmailChange: (String) -> Unit,
-    onPhoneChange: (String) -> Unit,
     onPassChange: (String) -> Unit,
     onConfirmChange: (String) -> Unit,
     onSubmit: () -> Unit,
@@ -116,8 +113,8 @@ private fun RegisterScreen(
             .fillMaxSize()
             .background(RT_Gradient)
             .padding(horizontal = 18.dp, vertical = 12.dp)
-            .navigationBarsPadding() // evita choque con barra del sistema
-            .imePadding(),           // evita que el teclado tape el contenido
+            .navigationBarsPadding()
+            .imePadding(),
         contentAlignment = Alignment.Center
     ) {
         Surface(
@@ -133,12 +130,11 @@ private fun RegisterScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(scroll)           // ← hace scrolleable TODO el formulario
+                    .verticalScroll(scroll)
                     .padding(horizontal = 20.dp)
-                    .padding(top = 16.dp, bottom = 24.dp), // respiración extra inferior
+                    .padding(top = 16.dp, bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // ← Flecha + texto "Volver al login" (arriba a la izquierda)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -161,14 +157,13 @@ private fun RegisterScreen(
 
                 Spacer(Modifier.height(6.dp))
 
-                // Header con logo + título
                 if (logoId != 0) {
                     Icon(
                         painter = painterResource(id = logoId),
                         contentDescription = "RedThread",
                         tint = Color.Unspecified,
                         modifier = Modifier
-                            .height(52.dp)                 // un poco más compacto
+                            .height(52.dp)
                             .padding(bottom = 6.dp)
                     )
                 }
@@ -189,7 +184,7 @@ private fun RegisterScreen(
                 )
                 Spacer(Modifier.height(16.dp))
 
-                // Campos (ligeramente más compactos con menos spacing)
+                // Campo NOMBRE
                 OutlinedTextField(
                     value = name,
                     onValueChange = onNameChange,
@@ -211,6 +206,7 @@ private fun RegisterScreen(
 
                 Spacer(Modifier.height(10.dp))
 
+                // Campo EMAIL
                 OutlinedTextField(
                     value = email,
                     onValueChange = onEmailChange,
@@ -230,29 +226,11 @@ private fun RegisterScreen(
                     )
                 }
 
-                Spacer(Modifier.height(10.dp))
-
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = onPhoneChange,
-                    label = { Text("Teléfono") },
-                    leadingIcon = { Icon(Icons.Outlined.Phone, contentDescription = null) },
-                    singleLine = true,
-                    isError = phoneError != null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                if (phoneError != null) {
-                    Text(
-                        phoneError,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+                // ❌ ESPACIO Y CAMPO TELEFONO ELIMINADOS AQUI
 
                 Spacer(Modifier.height(10.dp))
 
+                // Campo PASSWORD
                 OutlinedTextField(
                     value = pass,
                     onValueChange = onPassChange,
@@ -282,6 +260,7 @@ private fun RegisterScreen(
 
                 Spacer(Modifier.height(10.dp))
 
+                // Campo CONFIRM PASSWORD
                 OutlinedTextField(
                     value = confirm,
                     onValueChange = onConfirmChange,

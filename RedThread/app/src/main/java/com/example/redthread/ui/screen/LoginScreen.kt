@@ -1,50 +1,58 @@
 package com.example.redthread.ui.screen
 
-import androidx.compose.foundation.background                 // Fondo
-import androidx.compose.foundation.layout.*                   // Box/Column/Row/Spacer
-import androidx.compose.foundation.shape.RoundedCornerShape   // Bordes redondeados
+import android.annotation.SuppressLint
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons                  // Íconos Material
-import androidx.compose.material.icons.filled.Visibility      // Ícono mostrar contraseña
-import androidx.compose.material.icons.filled.VisibilityOff   // Ícono ocultar contraseña
-import androidx.compose.material.icons.outlined.Email         // Ícono email
-import androidx.compose.material.icons.outlined.Lock          // Ícono candado
-import androidx.compose.material3.*                           // Material 3
-import androidx.compose.runtime.*                             // remember y Composable
-import androidx.compose.ui.Alignment                          // Alineaciones
-import androidx.compose.ui.Modifier                           // Modificador
-import androidx.compose.ui.graphics.Brush                     // Degradados
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.Email
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.*                       // KeyboardOptions/Types/Transformations
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp                            // DPs
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.compose.collectAsStateWithLifecycle // Observa StateFlow con lifecycle
-import com.example.redthread.ui.viewmodel.AuthViewModel       // Nuestro ViewModel
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.redthread.ui.viewmodel.AuthViewModel
 
-// color/accent sugerido para RedThread (rojo elegante)
 private val RT_Red = Color(0xFFE11D2E)
-// degradado oscuro para el fondo
 private val RT_Gradient = Brush.verticalGradient(
     colors = listOf(Color(0xFF0F0F11), Color(0xFF1A1B20))
 )
-// contorno suave de la tarjeta
 private val CardShape = RoundedCornerShape(18.dp)
 
-//1 Lo primero que creamos en el archivo
-@Composable                                                  // Pantalla Login conectada al VM
+@SuppressLint("StateFlowValueCalledInComposition")
+@Composable
 fun LoginScreenVm(
-    vm: AuthViewModel,                            // recibimos el VM desde NavGraph
-    onLoginOkNavigateHome: () -> Unit,            // Navega a Home cuando el login es exitoso
-    onGoRegister: () -> Unit,                     // Navega a Registro
-    onForgot: () -> Unit                          // <-- NUEVO: Navega a Recuperar contraseña
+    vm: AuthViewModel,
+    onCustomerNavigate: () -> Unit,
+    onAdminNavigate: () -> Unit,
+    onDriverNavigate: () -> Unit,
+    onGoRegister: () -> Unit,
+    onForgot: () -> Unit
 ) {
     val state by vm.login.collectAsStateWithLifecycle()
+    val header by vm.header.collectAsStateWithLifecycle()
 
-    if (state.success) {
-        vm.clearLoginResult()
-        onLoginOkNavigateHome()
+    // ✅ CORRECCIÓN: Navegación segura con LaunchedEffect
+    LaunchedEffect(state.success, header.isLoggedIn) {
+        if (state.success && header.isLoggedIn) {
+            vm.clearLoginResult()
+
+            when (header.role) {
+                "ADMIN" -> onAdminNavigate()
+                "DESPACHADOR" -> onDriverNavigate()
+                else -> onCustomerNavigate()
+            }
+        }
     }
 
     LoginScreen(
@@ -59,12 +67,10 @@ fun LoginScreenVm(
         onPassChange = vm::onLoginPassChange,
         onSubmit = vm::submitLogin,
         onGoRegister = onGoRegister,
-        onForgot = onForgot              // <-- NUEVO
+        onForgot = onForgot
     )
 }
 
-
-//2 UI presentacional
 @Composable
 private fun LoginScreen(
     email: String,
@@ -78,7 +84,7 @@ private fun LoginScreen(
     onPassChange: (String) -> Unit,
     onSubmit: () -> Unit,
     onGoRegister: () -> Unit,
-    onForgot: () -> Unit                // <-- NUEVO
+    onForgot: () -> Unit
 ) {
     var showPass by remember { mutableStateOf(false) }
 
@@ -171,7 +177,6 @@ private fun LoginScreen(
                     )
                 }
 
-                // ¿Olvidaste tu contraseña?
                 Spacer(Modifier.height(8.dp))
                 TextButton(
                     onClick = onForgot,

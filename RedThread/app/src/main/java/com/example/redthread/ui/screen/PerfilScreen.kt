@@ -7,7 +7,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
@@ -26,6 +25,7 @@ import com.example.redthread.ui.theme.AccentRed
 import com.example.redthread.ui.theme.Black
 import com.example.redthread.ui.theme.TextPrimary
 import com.example.redthread.ui.theme.TextSecondary
+import com.example.redthread.ui.viewmodel.AuthHeaderState
 import com.example.redthread.ui.viewmodel.ProfileState
 import com.example.redthread.ui.viewmodel.ProfileViewModel
 import kotlinx.coroutines.launch
@@ -36,22 +36,19 @@ fun PerfilScreen(
     onLogout: () -> Unit,
     onGoAdmin: () -> Unit,
     onGoDespachador: () -> Unit,
-    navController: NavHostController, // 👈 agregado
+    navController: NavHostController,
+    header: AuthHeaderState,        // <- VIENE DEL AuthViewModel
     vm: ProfileViewModel = viewModel()
-)
- {
+) {
     val state by vm.state.collectAsStateWithLifecycle()
 
     var showAddressDialog by remember { mutableStateOf(false) }
     var editingAddress by remember { mutableStateOf<AddressEntity?>(null) }
 
-    var showEditProfile by remember { mutableStateOf(false) }
-    var showChangePass by remember { mutableStateOf(false) }
-
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    // Toasts (success / error)
+    // Notificaciones
     LaunchedEffect(state.success) {
         state.success?.let {
             scope.launch { snackbarHostState.showSnackbar(it) }
@@ -69,34 +66,44 @@ fun PerfilScreen(
         containerColor = Black,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Black)
                 .padding(padding)
                 .padding(horizontal = 16.dp, vertical = 12.dp)
-                .verticalScroll(rememberScrollState()) // ✅ scrolleable
+                .verticalScroll(rememberScrollState())
         ) {
 
             Text("Mi Perfil", color = TextPrimary, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
 
             when {
+
                 state.loading -> {
-                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    LinearProgressIndicator(Modifier.fillMaxWidth())
                 }
-                state.user == null -> {
+
+                !header.isLoggedIn -> {
                     Text("No hay sesión activa.", color = TextSecondary)
                 }
+
                 else -> {
-                    // Encabezado + botón Editar (abre modal)
+
+                    // HEADER DEL USUARIO
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant
+                        )
                     ) {
                         Column(Modifier.padding(12.dp)) {
-                            EncabezadoPerfil(state)
+
+                            EncabezadoPerfil(header, state)
+
                             Spacer(Modifier.height(10.dp))
+
                             Row(
                                 Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -104,15 +111,10 @@ fun PerfilScreen(
                             ) {
                                 when (role) {
                                     UserRole.ADMINISTRADOR ->
-                                        BotonRol(texto = "Ir al Panel de Administrador", onClick = onGoAdmin)
+                                        BotonRol("Ir al Panel de Administrador", onGoAdmin)
                                     UserRole.DESPACHADOR ->
-                                        BotonRol(texto = "Ir al Panel de Despachador", onClick = onGoDespachador)
+                                        BotonRol("Ir al Panel de Despachador", onGoDespachador)
                                     else -> Spacer(Modifier.width(1.dp))
-                                }
-                                TextButton(onClick = { showEditProfile = true }) {
-                                    Icon(Icons.Filled.Edit, contentDescription = null)
-                                    Spacer(Modifier.width(6.dp))
-                                    Text("Editar perfil")
                                 }
                             }
                         }
@@ -120,7 +122,7 @@ fun PerfilScreen(
 
                     Spacer(Modifier.height(16.dp))
 
-                    // ===== Sección direcciones =====
+                    // DIRECCIONES
                     SeccionDirecciones(
                         addresses = state.addresses,
                         onAdd = { editingAddress = null; showAddressDialog = true },
@@ -131,9 +133,7 @@ fun PerfilScreen(
 
                     Spacer(Modifier.height(24.dp))
 
-                    // Botón cerrar sesión (siempre accesible por el scroll de la página)
-                    // Botón historial de compras
-                    // Botón historial de compras
+                    // HISTORIAL
                     Button(
                         onClick = {
                             navController.navigate(Route.HistorialCompras.path) {
@@ -141,7 +141,9 @@ fun PerfilScreen(
                                 popUpTo(Route.Perfil.path) { inclusive = false }
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp)
@@ -149,29 +151,22 @@ fun PerfilScreen(
                         Text("Ver historial de compras", color = TextPrimary)
                     }
 
-
-// Botón cerrar sesión
+                    // CERRAR SESIÓN
                     Button(
                         onClick = {
-                            try {
-                                onLogout()
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                            try { onLogout() } catch (_: Exception) {}
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentRed),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text("Cerrar sesión", color = TextPrimary)
                     }
-
-
                 }
             }
         }
     }
 
-    // ===== Modales =====
+    // MODAL DIRECCIÓN
     if (showAddressDialog) {
         DialogDireccion(
             edit = editingAddress,
@@ -182,38 +177,23 @@ fun PerfilScreen(
             }
         )
     }
-
-    if (showEditProfile) {
-        EditProfileDialog(
-            state = state,
-            onDismiss = { showEditProfile = false; vm.clearMessages() },
-            onSave = { email, phone ->
-                vm.updateEmailPhone(email, phone)
-                showEditProfile = false
-            },
-            onChangePass = { showEditProfile = false; showChangePass = true }
-        )
-    }
-
-    if (showChangePass) {
-        ChangePasswordDialog(
-            onDismiss = { showChangePass = false; vm.clearMessages() },
-            onSubmit = { old, new, confirm ->
-                vm.changePassword(old, new, confirm)
-                showChangePass = false
-            }
-        )
-    }
 }
 
 @Composable
-private fun EncabezadoPerfil(state: ProfileState) {
-    val u = state.user!!
+private fun EncabezadoPerfil(
+    header: AuthHeaderState,
+    state: ProfileState
+) {
+    val u = state.user
+    val name = header.displayName ?: u?.name ?: "Usuario"
+    val email = header.email ?: u?.email ?: ""
+    val phone = u?.phone.orEmpty()
+
     Column {
-        Text(u.name, fontWeight = FontWeight.Bold, color = TextPrimary)
+        Text(name, fontWeight = FontWeight.Bold, color = TextPrimary)
         Spacer(Modifier.height(2.dp))
-        Text(u.email, color = TextSecondary)
-        if (u.phone.isNotBlank()) Text("Tel: ${u.phone}", color = TextSecondary)
+        if (email.isNotBlank()) Text(email, color = TextSecondary)
+        if (phone.isNotBlank()) Text("Tel: $phone", color = TextSecondary)
     }
 }
 
@@ -222,69 +202,6 @@ private fun BotonRol(texto: String, onClick: () -> Unit) {
     Button(onClick = onClick) { Text(texto) }
 }
 
-/* ===============================
-   Modal Editar perfil (email/teléfono)
-   =============================== */
-@Composable
-private fun EditProfileDialog(
-    state: ProfileState,
-    onDismiss: () -> Unit,
-    onSave: (email: String, phone: String) -> Unit,
-    onChangePass: () -> Unit
-) {
-    val u = state.user!!
-    var email by remember(u.email) { mutableStateOf(u.email) }
-    var phone by remember(u.phone) { mutableStateOf(u.phone) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            Button(onClick = { onSave(email.trim(), phone.trim()) }) { Text("Guardar") }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = onChangePass) {
-                    Icon(Icons.Filled.Lock, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Cambiar contraseña")
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onDismiss) { Text("Cancelar") }
-            }
-        },
-        title = { Text("Editar perfil") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Nombre bloqueado
-                OutlinedTextField(
-                    value = u.name,
-                    onValueChange = {},
-                    label = { Text("Nombre") },
-                    enabled = false,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Correo") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = phone,
-                    onValueChange = { phone = it },
-                    label = { Text("Teléfono") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-            }
-        }
-    )
-}
-
-/* ===============================
-   Sección de direcciones (sin LazyColumn para evitar nested scroll)
-   =============================== */
 @Composable
 private fun SeccionDirecciones(
     addresses: List<AddressEntity>,
@@ -293,6 +210,7 @@ private fun SeccionDirecciones(
     onDelete: (AddressEntity) -> Unit,
     onSetDefault: (AddressEntity) -> Unit
 ) {
+
     Row(
         Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -309,6 +227,7 @@ private fun SeccionDirecciones(
             addresses.forEach { dir ->
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                     Column(Modifier.padding(12.dp)) {
+
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (dir.predeterminada) {
                                 Icon(Icons.Filled.Star, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -318,6 +237,7 @@ private fun SeccionDirecciones(
                             Spacer(Modifier.width(6.dp))
                             Text("${dir.alias} — ${dir.ciudad}")
                         }
+
                         Spacer(Modifier.height(6.dp))
                         Text(dir.linea1)
                         dir.linea2?.takeIf { it.isNotBlank() }?.let { Text(it) }
@@ -325,13 +245,21 @@ private fun SeccionDirecciones(
                         Text(dir.pais + (dir.codigoPostal?.let { ", $it" } ?: ""))
 
                         Spacer(Modifier.height(8.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
                             TextButton(onClick = { onSetDefault(dir) }) {
                                 Text(if (dir.predeterminada) "Predeterminada" else "Establecer como predeterminada")
                             }
                             Row {
-                                IconButton(onClick = { onEdit(dir) }) { Icon(Icons.Filled.Edit, contentDescription = "Editar") }
-                                IconButton(onClick = { onDelete(dir) }) { Icon(Icons.Filled.Delete, contentDescription = "Eliminar") }
+                                IconButton(onClick = { onEdit(dir) }) {
+                                    Icon(Icons.Filled.Edit, contentDescription = "Editar")
+                                }
+                                IconButton(onClick = { onDelete(dir) }) {
+                                    Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
+                                }
                             }
                         }
                     }
@@ -341,9 +269,6 @@ private fun SeccionDirecciones(
     }
 }
 
-/* ===============================
-   Diálogo crear/editar dirección
-   =============================== */
 @Composable
 private fun DialogDireccion(
     edit: AddressEntity?,
@@ -354,6 +279,7 @@ private fun DialogDireccion(
         pais: String, cp: String?, pred: Boolean
     ) -> Unit
 ) {
+
     var alias by remember { mutableStateOf(edit?.alias ?: "") }
     var l1 by remember { mutableStateOf(edit?.linea1 ?: "") }
     var l2 by remember { mutableStateOf(edit?.linea2 ?: "") }
@@ -369,58 +295,30 @@ private fun DialogDireccion(
         confirmButton = {
             val canSave = alias.isNotBlank() && l1.isNotBlank() &&
                     comuna.isNotBlank() && ciudad.isNotBlank() && region.isNotBlank()
-            Button(onClick = {
-                onSave(alias, l1, l2.ifBlank { null }, comuna, ciudad, region, pais, cp.ifBlank { null }, pred)
-            }, enabled = canSave) { Text("Guardar") }
+
+            Button(
+                onClick = {
+                    onSave(alias, l1, l2.ifBlank { null }, comuna, ciudad, region, pais, cp.ifBlank { null }, pred)
+                },
+                enabled = canSave
+            ) { Text("Guardar") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
         title = { Text(if (edit == null) "Nueva dirección" else "Editar dirección") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = alias, onValueChange = { alias = it }, label = { Text("Alias (Casa, Trabajo)") })
-                OutlinedTextField(value = l1, onValueChange = { l1 = it }, label = { Text("Dirección (calle y número)") })
+                OutlinedTextField(value = alias, onValueChange = { alias = it }, label = { Text("Alias") })
+                OutlinedTextField(value = l1, onValueChange = { l1 = it }, label = { Text("Dirección") })
                 OutlinedTextField(value = l2, onValueChange = { l2 = it }, label = { Text("Complemento (opcional)") })
                 OutlinedTextField(value = comuna, onValueChange = { comuna = it }, label = { Text("Comuna") })
                 OutlinedTextField(value = ciudad, onValueChange = { ciudad = it }, label = { Text("Ciudad") })
                 OutlinedTextField(value = region, onValueChange = { region = it }, label = { Text("Región") })
                 OutlinedTextField(value = pais, onValueChange = { pais = it }, label = { Text("País") })
-                OutlinedTextField(value = cp, onValueChange = { cp = it }, label = { Text("Código postal (opcional)") })
+                OutlinedTextField(value = cp, onValueChange = { cp = it }, label = { Text("Código postal") })
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = pred, onCheckedChange = { pred = it })
                     Text("Predeterminada")
                 }
-            }
-        }
-    )
-}
-
-/* ===============================
-   Diálogo cambiar contraseña
-   =============================== */
-@Composable
-private fun ChangePasswordDialog(
-    onDismiss: () -> Unit,
-    onSubmit: (old: String, new: String, confirm: String) -> Unit
-) {
-    var oldPass by remember { mutableStateOf("") }
-    var newPass by remember { mutableStateOf("") }
-    var confirm by remember { mutableStateOf("") }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        confirmButton = {
-            val canSave = oldPass.isNotBlank() && newPass.length >= 6 && confirm.isNotBlank()
-            Button(onClick = { onSubmit(oldPass, newPass, confirm) }, enabled = canSave) {
-                Text("Actualizar")
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
-        title = { Text("Cambiar contraseña") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(value = oldPass, onValueChange = { oldPass = it }, label = { Text("Contraseña actual") }, singleLine = true)
-                OutlinedTextField(value = newPass, onValueChange = { newPass = it }, label = { Text("Nueva contraseña (min 6)") }, singleLine = true)
-                OutlinedTextField(value = confirm, onValueChange = { confirm = it }, label = { Text("Confirmar nueva") }, singleLine = true)
             }
         }
     )

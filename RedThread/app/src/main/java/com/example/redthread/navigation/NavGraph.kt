@@ -95,8 +95,20 @@ fun AppNavGraph(
             composable(Route.Login.path) {
                 LoginScreenVm(
                     vm = authViewModel,
-                    onLoginOkNavigateHome = {
+                    onCustomerNavigate = {
                         navController.navigate(Route.Home.path) {
+                            launchSingleTop = true
+                            popUpTo(Route.Home.path) { inclusive = false }
+                        }
+                    },
+                    onAdminNavigate = {
+                        navController.navigate(Route.VistaModerador.path) {
+                            launchSingleTop = true
+                            popUpTo(Route.Home.path) { inclusive = false }
+                        }
+                    },
+                    onDriverNavigate = {
+                        navController.navigate(Route.Despachador.path) {
                             launchSingleTop = true
                             popUpTo(Route.Home.path) { inclusive = false }
                         }
@@ -104,10 +116,8 @@ fun AppNavGraph(
                     onGoRegister = {
                         navController.navigate(Route.Register.path) { launchSingleTop = true }
                     },
-                    onForgot = {                                      // <-- AGREGADO
-                        navController.navigate(Route.Forgot.path) {   // navega al flujo de recuperación
-                            launchSingleTop = true
-                        }
+                    onForgot = {
+                        navController.navigate(Route.Forgot.path) { launchSingleTop = true }
                     }
                 )
             }
@@ -142,9 +152,9 @@ fun AppNavGraph(
                         onLogout = { authViewModel.logout() },
                         onGoAdmin = { navController.navigate(Route.VistaModerador.path) },
                         onGoDespachador = { navController.navigate(Route.Despachador.path) },
-                        navController = navController // 👈 agrega esto
+                        navController = navController,
+                        header = header          // ✅ PASAMOS EL HEADER
                     )
-
                 }
             }
 
@@ -194,7 +204,6 @@ fun AppNavGraph(
                     total = total,
                     metodo = if (m == "CREDITO") MetodoPago.CREDITO else MetodoPago.DEBITO,
                     onFinish = {
-                        // Decide dónde volver. Ej: Home:
                         navController.popBackStack(Route.Home.path, inclusive = false)
                     }
                 )
@@ -215,12 +224,13 @@ fun AppNavGraph(
             composable(Route.Despachador.path) {
                 DespachadorScreen()
             }
+
             // Historial de compras
             composable(Route.HistorialCompras.path) {
                 HistorialComprasScreen(navController)
             }
 
-// Detalle de compra
+            // Detalle de compra
             composable(
                 route = "${Route.DetalleCompra.path}/{id}/{fecha}/{total}/{productos}"
             ) { backStack ->
@@ -245,8 +255,7 @@ fun AppNavGraph(
                 )
             }
 
-
-            // Detalle de producto (query params)
+            // Detalle de producto
             composable("${Route.ProductoDetalle.path}?id={id}&nombre={nombre}&precio={precio}&categoria={categoria}") { backStack ->
                 val id = backStack.arguments?.getString("id")?.toIntOrNull() ?: -1
                 fun dec(s: String?) = java.net.URLDecoder.decode(
@@ -277,7 +286,7 @@ fun AppNavGraph(
             // Olvidé contraseña
             composable(Route.Forgot.path) {
                 ForgotPasswordScreenVm(
-                    vm = authViewModel,   // <<-- PASAMOS EL MISMO VM
+                    vm = authViewModel,
                     onDoneGoLogin = {
                         navController.navigate(Route.Login.path) {
                             launchSingleTop = true
