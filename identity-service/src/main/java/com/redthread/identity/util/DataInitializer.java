@@ -15,6 +15,7 @@ public class DataInitializer implements CommandLineRunner {
 
     private final RoleRepository roleRepo;
     private final UserRepository userRepo;
+    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
 
     public DataInitializer(RoleRepository roleRepo, UserRepository userRepo) {
         this.roleRepo = roleRepo;
@@ -26,13 +27,12 @@ public class DataInitializer implements CommandLineRunner {
         System.out.println("Inicializando datos base...");
 
         ensureRole("CLIENTE", "Cliente");
-        ensureRole("VENDEDOR", "Vendedor");
-        ensureRole("REPARTIDOR", "Repartidor");
-        ensureRole("ADMIN", "Administrador");
+        ensureRole("DESPACHADOR", "Despachador");
+        ensureRole("ADMINISTRADOR", "Administrador");
 
         ensureAdmin();
-        ensureVendedor();
-        ensureRepartidor();
+        ensureCliente();
+        ensureDespachador();
 
         System.out.println("Inicialización completa.");
     }
@@ -52,26 +52,26 @@ public class DataInitializer implements CommandLineRunner {
         createUserIfNotExists(
                 "admin@redthread.cl",
                 "123456",
-                "Admin Root",
-                "ADMIN"
+                "Admin",
+                "ADMINISTRADOR"
         );
     }
 
-    private void ensureVendedor() {
+    private void ensureCliente() {
         createUserIfNotExists(
-                "vendedor@redthread.cl",
+                "cliente@redthread.cl",
                 "123456",
-                "Vendedor Oficial",
-                "VENDEDOR"
+                "Cliente General",
+                "CLIENTE"
         );
     }
 
-    private void ensureRepartidor() {
+    private void ensureDespachador() {
         createUserIfNotExists(
-                "repartidor@redthread.cl",
+                "despachador@redthread.cl",
                 "123456",
-                "Repartidor General",
-                "REPARTIDOR"
+                "Despachador General",
+                "DESPACHADOR"
         );
     }
 
@@ -79,11 +79,13 @@ public class DataInitializer implements CommandLineRunner {
         userRepo.findByEmail(email).orElseGet(() -> {
             var role = roleRepo.findByKey(roleKey)
                     .orElseThrow(() -> new IllegalStateException("El rol " + roleKey + " no existe"));
+
             User u = new User();
             u.setEmail(email);
             u.setFullName(fullName);
-            u.setPassword(new BCryptPasswordEncoder().encode(rawPassword)); // ← cambiado
+            u.setPassword(encoder.encode(rawPassword));
             u.setRoles(Set.of(role));
+
             userRepo.save(u);
             System.out.println("👤 Usuario creado: " + email + " [" + roleKey + "]");
             return u;

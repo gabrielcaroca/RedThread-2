@@ -17,7 +17,6 @@ object ApiClient {
 
     private fun build(baseUrl: String): Retrofit {
         println("➡️ Base URL usada por Retrofit: $baseUrl")
-
         return Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
@@ -25,8 +24,12 @@ object ApiClient {
             .build()
     }
 
+    val identity: AuthApi =
+        build(BaseUrls.IDENTITY).create(AuthApi::class.java)
 
+    val orders: OrdersApi =
+        build(BaseUrls.ORDERS).create(OrdersApi::class.java)
 
-    // Cliente IdentityService
-    val identity: AuthApi = build(BaseUrls.IDENTITY).create(AuthApi::class.java)
+    val delivery: DeliveryApi =
+        build(BaseUrls.DELIVERY).create(DeliveryApi::class.java)
 }

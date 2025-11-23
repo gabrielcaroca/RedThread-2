@@ -1,8 +1,6 @@
 package com.redthread.order.controller;
 
-import com.redthread.order.dto.OrderItemRes;
-import com.redthread.order.dto.OrderRes;
-import com.redthread.order.dto.PayReq;
+import com.redthread.order.dto.*;
 import com.redthread.order.model.Order;
 import com.redthread.order.security.JwtUserResolver;
 import com.redthread.order.service.OrderService;
@@ -11,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/orders")
@@ -55,6 +54,58 @@ public class OrderController {
             )
         ).toList()
     );
+  }
+
+  /**
+   * NUEVO: Endpoint interno para delivery-service.
+   * Retorna userId y shippingAddress con las llaves exactas que
+   * ShipmentServiceImpl espera hoy:
+   *  - userId
+   *  - shippingAddress { line1, line2, city, state, zip, country }
+   */
+  @GetMapping("/{id}/delivery")
+  public OrderDeliveryRes deliveryDetail(@PathVariable Long id) {
+    // se respeta ownership del cliente porque delivery llama con bearer del cliente al crear envío
+    Order o = orderService.getByIdForUser(id, auth.currentUserId());
+
+    var a = o.getAddress();
+    AddressRes addr = new AddressRes(
+        a.getId(),
+        a.getLine1(),
+        a.getLine2(),
+        a.getCity(),
+        a.getState(),
+        a.getZip(),
+        a.getCountry(),
+        a.isDefault()
+    );
+
+    return new OrderDeliveryRes(
+        o.getId(),
+        o.getStatus().name(),
+        o.getTotalAmount(),
+        o.getUserId(),
+        addr, // OJO: se devuelve como "shippingAddress"
+        o.getItems().stream().map(i ->
+            new OrderItemRes(
+                i.getVariantId(),
+                i.getQuantity(),
+                i.getUnitPrice(),
+                i.getLineTotal()
+            )
+        ).toList()
+    );
+  }
+
+  /**
+   * NUEVO: Webhook interno que delivery-service intenta llamar.
+   * NO valida ownership porque quien llama es el repartidor/admin.
+   */
+  @PostMapping("/{id}/delivery-status")
+  public void deliveryStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    String status = body.get("status");
+    String note = body.get("note");
+    orderService.updateDeliveryStatusInternal(id, status, note);
   }
 
   @PostMapping("/{id}/pay")
