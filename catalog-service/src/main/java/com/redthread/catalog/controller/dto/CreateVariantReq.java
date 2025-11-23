@@ -11,5 +11,6 @@ public record CreateVariantReq(
         @NotBlank String color,
         String sku,
         @DecimalMin(value = "0.0", inclusive = true)
-        BigDecimal priceOverride
+        BigDecimal priceOverride,
+        @Min(0) Integer stock   
 ) {}

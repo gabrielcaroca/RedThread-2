@@ -24,13 +24,7 @@ public class VariantController {
 
     @PostMapping
     public ResponseEntity<Variant> create(@RequestBody @Valid CreateVariantReq req) {
-        Variant created = service.create(
-                req.productId(),
-                req.sizeType(),
-                req.sizeValue(),
-                req.color(),
-                req.sku(),
-                req.priceOverride());
+        Variant created = service.create(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
