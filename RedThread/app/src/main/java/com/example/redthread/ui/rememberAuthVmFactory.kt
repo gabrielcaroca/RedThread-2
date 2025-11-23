@@ -19,12 +19,16 @@ class AuthVmFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(AuthViewModel::class.java)) {
-            val repo = AuthRepository(context)
+
+            // ⚠️ CORREGIDO: ahora sí pasamos sessionPrefs al repositorio
+            val repo = AuthRepository(context, sessionPrefs)
+
             return AuthViewModel(repo, sessionPrefs) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+
 
 @Composable
 fun rememberAuthViewModel(): AuthViewModel {

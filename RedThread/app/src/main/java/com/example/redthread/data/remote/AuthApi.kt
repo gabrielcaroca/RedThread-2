@@ -1,9 +1,9 @@
 package com.example.redthread.data.remote
 
-import com.example.redthread.data.remote.dto.AuthResponse
-import com.example.redthread.data.remote.dto.LoginRequest
-import com.example.redthread.data.remote.dto.RegisterRequest
-import com.example.redthread.data.remote.dto.UserProfileDto
+import com.example.redthread.data.remote.Dto.AuthResponse
+import com.example.redthread.data.remote.Dto.LoginRequest
+import com.example.redthread.data.remote.Dto.RegisterRequest
+import com.example.redthread.data.remote.Dto.UserProfileDto
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET

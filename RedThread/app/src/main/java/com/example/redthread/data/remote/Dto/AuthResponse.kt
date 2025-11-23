@@ -1,4 +1,4 @@
-package com.example.redthread.data.remote.dto
+package com.example.redthread.data.remote.Dto
 
 data class AuthResponse(
     val tokenType: String,

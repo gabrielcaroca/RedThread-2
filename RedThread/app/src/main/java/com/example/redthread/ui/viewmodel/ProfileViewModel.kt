@@ -1,165 +1,143 @@
+// ProfileViewModel.kt
 package com.example.redthread.ui.viewmodel
 
-import android.app.Application
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.redthread.data.local.SessionPrefs
-import com.example.redthread.data.local.address.AddressEntity
-import com.example.redthread.data.local.database.AppDatabase
-import com.example.redthread.data.local.user.UserEntity
-import kotlinx.coroutines.flow.*
+import com.example.redthread.data.remote.Dto.AddressDto
+import com.example.redthread.data.remote.Dto.CreateAddressRequest
+import com.example.redthread.data.remote.Dto.UpdateAddressRequest
+import com.example.redthread.data.repository.AddressRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ProfileState(
-    val user: UserEntity? = null,
-    val addresses: List<AddressEntity> = emptyList(),
-    val loading: Boolean = true,
+    val addresses: List<AddressDto> = emptyList(),
+    val loading: Boolean = false,
     val error: String? = null,
     val success: String? = null
 )
 
-class ProfileViewModel(app: Application) : AndroidViewModel(app) {
-
-    private val db = AppDatabase.getInstance(app)
-    private val userDao = db.userDao()
-    private val addressDao = db.addressDao()
-    private val prefs = SessionPrefs(app)
+class ProfileViewModel(
+    private val repo: AddressRepository
+) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileState())
-    val state: StateFlow<ProfileState> = _state.asStateFlow()
+    val state: StateFlow<ProfileState> = _state
 
-    private var currentUserId: Int? = null
+    private fun startLoading() {
+        _state.update { it.copy(loading = true, error = null, success = null) }
+    }
 
-    init {
-        viewModelScope.launch {
-            prefs.userEmailFlow.collectLatest { email ->
-                if (email.isNullOrBlank()) {
-                    _state.update { it.copy(loading = false, user = null, addresses = emptyList()) }
-                } else {
-                    val u = userDao.getByEmail(email)
-                    currentUserId = u?.id
-                    _state.update { it.copy(user = u, loading = false, error = null, success = null) }
+    private fun finishSuccess(msg: String) {
+        _state.update { it.copy(loading = false, success = msg) }
+    }
 
-                    if (u != null) {
-                        addressDao.observarPorUsuario(u.id).collectLatest { list ->
-                            _state.update { s -> s.copy(addresses = list) }
-                        }
-                    } else {
-                        _state.update { s -> s.copy(addresses = emptyList()) }
-                    }
-                }
-            }
-        }
+    private fun finishError(msg: String) {
+        _state.update { it.copy(loading = false, error = msg) }
     }
 
     fun clearMessages() {
         _state.update { it.copy(error = null, success = null) }
     }
 
-    /* ===== Direcciones ===== */
-    fun upsertAddress(
-        alias: String,
-        linea1: String,
-        linea2: String?,
-        comuna: String,
-        ciudad: String,
-        region: String,
-        pais: String,
-        codigoPostal: String?,
-        predeterminada: Boolean,
-        idEdit: Long? = null
+    fun loadAddresses() {
+        viewModelScope.launch {
+            startLoading()
+            try {
+                val list = repo.list()
+                _state.update { it.copy(addresses = list) }
+                finishSuccess("Direcciones cargadas")
+            } catch (e: Exception) {
+                finishError(e.message ?: "Error al cargar direcciones")
+            }
+        }
+    }
+
+    fun createAddress(
+        line1: String,
+        city: String,
+        state: String,
+        zip: String,
+        country: String,
+        isDefault: Boolean
     ) {
-        val uid = currentUserId ?: return
         viewModelScope.launch {
-            val toSave = AddressEntity(
-                id = idEdit ?: 0,
-                userId = uid,
-                alias = alias.trim(),
-                linea1 = linea1.trim(),
-                linea2 = linea2?.trim(),
-                comuna = comuna.trim(),
-                ciudad = ciudad.trim(),
-                region = region.trim(),
-                pais = pais.trim(),
-                codigoPostal = codigoPostal?.trim(),
-                predeterminada = predeterminada
-            )
-            if (predeterminada) addressDao.clearDefault(uid)
-            addressDao.upsert(toSave)
-            _state.update { it.copy(success = "Dirección guardada") }
+            startLoading()
+            try {
+                val req = CreateAddressRequest(
+                    line1 = line1,
+                    line2 = "",          // si quieres soportar line2, agrégalo al diálogo
+                    city = city,
+                    state = state,
+                    zip = zip,
+                    country = country,
+                    default = isDefault
+                )
+                repo.create(req)
+                loadAddresses()
+                finishSuccess("Dirección creada")
+            } catch (e: Exception) {
+                finishError(e.message ?: "Error al crear dirección")
+            }
         }
     }
 
-    fun setDefaultAddress(addressId: Long) {
-        val uid = currentUserId ?: return
+    fun updateAddress(
+        id: Long,
+        line1: String,
+        city: String,
+        state: String,
+        zip: String,
+        country: String,
+        default: Boolean
+    ) {
         viewModelScope.launch {
-            addressDao.clearDefault(uid)
-            addressDao.setDefault(addressId)
-            _state.update { it.copy(success = "Predeterminada actualizada") }
+            startLoading()
+            try {
+                val req = UpdateAddressRequest(
+                    line1 = line1,
+                    line2 = "",          // igual que arriba
+                    city = city,
+                    state = state,
+                    zip = zip,
+                    country = country,
+                    default = default
+                )
+                repo.update(id.toInt(), req)
+                loadAddresses()
+                finishSuccess("Dirección actualizada")
+            } catch (e: Exception) {
+                finishError(e.message ?: "Error al actualizar dirección")
+            }
         }
     }
 
-    fun deleteAddress(address: AddressEntity) {
+    fun deleteAddress(id: Long) {
         viewModelScope.launch {
-            addressDao.delete(address)
-            _state.update { it.copy(success = "Dirección eliminada") }
+            startLoading()
+            try {
+                repo.delete(id.toInt())
+                loadAddresses()
+                finishSuccess("Dirección eliminada")
+            } catch (e: Exception) {
+                finishError(e.message ?: "Error al eliminar dirección")
+            }
         }
     }
 
-    /* ===== Datos de cuenta ===== */
-    fun updateEmailPhone(newEmail: String, newPhone: String) {
-        val u = state.value.user ?: return
-        val email = newEmail.trim()
-        val phone = newPhone.trim()
-
-        // Validaciones simples
-        val emailRegex = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")
-        if (!emailRegex.matches(email)) {
-            _state.update { it.copy(error = "Correo inválido") }
-            return
-        }
-        if (phone.length !in 7..20 || !phone.all { it.isDigit() || it == '+' || it == ' ' }) {
-            _state.update { it.copy(error = "Teléfono inválido") }
-            return
-        }
-
+    fun setDefaultAddress(id: Long) {
         viewModelScope.launch {
-            userDao.updateContact(u.id, email, phone)
-            // Refrescar usuario en memoria
-            val refreshed = userDao.getById(u.id)
-            _state.update { it.copy(user = refreshed, success = "Datos actualizados", error = null) }
-
-            // Actualiza la sesión (correo podría cambiar)
-            prefs.setSession(
-                logged = true,
-                email = refreshed?.email,
-                name = refreshed?.name,
-                userId = refreshed?.id?.toString(),
-                role = refreshed?.role?.name
-            )
-        }
-    }
-
-    fun changePassword(oldPass: String, newPass: String, confirm: String) {
-        val u = state.value.user ?: return
-
-        if (newPass.length < 6) {
-            _state.update { it.copy(error = "La nueva contraseña debe tener al menos 6 caracteres") }
-            return
-        }
-        if (newPass != confirm) {
-            _state.update { it.copy(error = "Las contraseñas no coinciden") }
-            return
-        }
-        if (oldPass != u.password) {
-            _state.update { it.copy(error = "La contraseña actual no es correcta") }
-            return
-        }
-
-        viewModelScope.launch {
-            userDao.updatePassword(u.id, newPass)
-            val refreshed = userDao.getById(u.id)
-            _state.update { it.copy(user = refreshed, success = "Contraseña actualizada", error = null) }
+            startLoading()
+            try {
+                val req = UpdateAddressRequest(default = true)
+                repo.update(id.toInt(), req)
+                loadAddresses()
+                finishSuccess("Predeterminada actualizada")
+            } catch (e: Exception) {
+                finishError(e.message ?: "No se pudo marcar como predeterminada")
+            }
         }
     }
 }

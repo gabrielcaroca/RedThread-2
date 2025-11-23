@@ -1,13 +1,13 @@
 package com.example.redthread.navigation
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -15,13 +15,14 @@ import androidx.navigation.navArgument
 import androidx.navigation.NavType
 import com.example.redthread.ui.components.AppTopBar
 import com.example.redthread.ui.screen.*
+import com.example.redthread.ui.screen.catalog.CreateProductScreen
+import com.example.redthread.ui.screen.catalog.CreateVariantScreen
+import com.example.redthread.ui.screen.catalog.UploadImageScreen
 import com.example.redthread.ui.theme.Black
-import com.example.redthread.ui.viewmodel.AuthViewModel
+import com.example.redthread.ui.viewmodel.*
 import com.example.redthread.domain.enums.UserRole
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.redthread.ui.viewmodel.CartViewModel
-import com.example.redthread.ui.viewmodel.DeveloperViewModel
-import com.example.redthread.ui.viewmodel.ProductoViewModel
+import com.example.redthread.data.remote.ApiClient
+import com.example.redthread.data.repository.CatalogRepository
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -32,7 +33,6 @@ fun AppNavGraph(
 ) {
     val header by authViewModel.header.collectAsState()
 
-    // VM del carrito a nivel de NavGraph
     val cartVm: CartViewModel = viewModel()
     val cartCount by cartVm.count.collectAsState()
 
@@ -51,13 +51,13 @@ fun AppNavGraph(
                 },
                 onPerfilClick = {
                     if (authViewModel.header.value.isLoggedIn) {
-                        navController.navigate(Route.Perfil.path) { launchSingleTop = true }
+                        navController.navigate(Route.Perfil.path)
                     } else {
-                        navController.navigate(Route.Login.path) { launchSingleTop = true }
+                        navController.navigate(Route.Login.path)
                     }
                 },
                 onCarritoClick = {
-                    navController.navigate(Route.Carrito.path) { launchSingleTop = true }
+                    navController.navigate(Route.Carrito.path)
                 },
                 cartCount = cartCount
             )
@@ -72,26 +72,26 @@ fun AppNavGraph(
                 .padding(innerPadding)
                 .background(Black)
         ) {
-            // Home
+
+            // HOME
             composable(Route.Home.path) {
                 HomeScreen(
                     onProductoClick = { p ->
                         val nombre = URLEncoder.encode(p.nombre, StandardCharsets.UTF_8.toString())
                         val precio = URLEncoder.encode(p.precio, StandardCharsets.UTF_8.toString())
-                        val categoria =
-                            URLEncoder.encode(p.categoria, StandardCharsets.UTF_8.toString())
+                        val categoria = URLEncoder.encode(p.categoria, StandardCharsets.UTF_8.toString())
 
                         navController.navigate(
                             "${Route.ProductoDetalle.path}?id=${p.id}&nombre=$nombre&precio=$precio&categoria=$categoria"
                         )
                     },
                     onCarritoClick = {
-                        navController.navigate(Route.Carrito.path) { launchSingleTop = true }
+                        navController.navigate(Route.Carrito.path)
                     }
                 )
             }
 
-            // Login
+            // LOGIN
             composable(Route.Login.path) {
                 LoginScreenVm(
                     vm = authViewModel,
@@ -103,44 +103,32 @@ fun AppNavGraph(
                     },
                     onAdminNavigate = {
                         navController.navigate(Route.VistaModerador.path) {
-                            launchSingleTop = true
                             popUpTo(Route.Home.path) { inclusive = false }
                         }
                     },
                     onDriverNavigate = {
                         navController.navigate(Route.Despachador.path) {
-                            launchSingleTop = true
                             popUpTo(Route.Home.path) { inclusive = false }
                         }
                     },
-                    onGoRegister = {
-                        navController.navigate(Route.Register.path) { launchSingleTop = true }
-                    },
-                    onForgot = {
-                        navController.navigate(Route.Forgot.path) { launchSingleTop = true }
-                    }
+                    onGoRegister = { navController.navigate(Route.Register.path) },
+                    onForgot = { navController.navigate(Route.Forgot.path) }
                 )
             }
 
-            // Register
+            // REGISTER
             composable(Route.Register.path) {
                 RegisterScreenVm(
                     vm = authViewModel,
-                    onRegisteredNavigateLogin = {
-                        navController.navigate(Route.Login.path) { launchSingleTop = true }
-                    },
-                    onGoLogin = {
-                        navController.navigate(Route.Login.path) { launchSingleTop = true }
-                    }
+                    onRegisteredNavigateLogin = { navController.navigate(Route.Login.path) },
+                    onGoLogin = { navController.navigate(Route.Login.path) }
                 )
             }
 
-            // Perfil
+            // PERFIL
             composable(Route.Perfil.path) {
                 if (!header.isLoggedIn) {
-                    LaunchedEffect(Unit) {
-                        navController.navigate(Route.Login.path) { launchSingleTop = true }
-                    }
+                    LaunchedEffect(Unit) { navController.navigate(Route.Login.path) }
                 } else {
                     val role = when (header.role) {
                         "ADMINISTRADOR" -> UserRole.ADMINISTRADOR
@@ -153,41 +141,33 @@ fun AppNavGraph(
                         onGoAdmin = { navController.navigate(Route.VistaModerador.path) },
                         onGoDespachador = { navController.navigate(Route.Despachador.path) },
                         navController = navController,
-                        header = header          // ✅ PASAMOS EL HEADER
+                        header = header
                     )
                 }
             }
 
-            // Carrito
+            // CARRITO
             composable(Route.Carrito.path) {
                 CarroScreen(
                     vm = cartVm,
-                    onGoCheckout = {
-                        navController.navigate(Route.Checkout.path) { launchSingleTop = true }
-                    }
+                    onGoCheckout = { navController.navigate(Route.Checkout.path) }
                 )
             }
 
-            // Checkout
+            // CHECKOUT
             composable(Route.Checkout.path) {
                 CheckoutScreen(
                     cartVm = cartVm,
-                    onGoPerfil = {
-                        navController.navigate(Route.Perfil.path) { launchSingleTop = true }
-                    },
-                    onPaidSuccess = { pedidoId, totalSnapshot, metodo ->
+                    onGoPerfil = { navController.navigate(Route.Perfil.path) },
+                    onPaidSuccess = { id, total, metodo ->
                         navController.navigate(
-                            buildPaymentProcessingPath(
-                                id = pedidoId,
-                                total = totalSnapshot,
-                                metodo = metodo.name // "DEBITO"/"CREDITO"
-                            )
+                            buildPaymentProcessingPath(id, total, metodo.name)
                         )
                     }
                 )
             }
 
-            // NUEVO: pantalla de proceso de pago (spinner → confirmación)
+            // PAYMENT
             composable(
                 route = Route.PaymentProcessing.path,
                 arguments = listOf(
@@ -195,84 +175,58 @@ fun AppNavGraph(
                     navArgument("total") { type = NavType.IntType },
                     navArgument("m") { type = NavType.StringType }
                 )
-            ) { backStackEntry ->
-                val id = backStackEntry.arguments?.getLong("id") ?: 0L
-                val total = backStackEntry.arguments?.getInt("total") ?: 0
-                val m = backStackEntry.arguments?.getString("m") ?: "DEBITO"
+            ) { backStack ->
+                val id = backStack.arguments?.getLong("id") ?: 0L
+                val total = backStack.arguments?.getInt("total") ?: 0
+                val method = backStack.arguments?.getString("m") ?: "DEBITO"
+
                 PaymentProcessingScreen(
                     pedidoId = id,
                     total = total,
-                    metodo = if (m == "CREDITO") MetodoPago.CREDITO else MetodoPago.DEBITO,
-                    onFinish = {
-                        navController.popBackStack(Route.Home.path, inclusive = false)
+                    metodo = if (method == "CREDITO") MetodoPago.CREDITO else MetodoPago.DEBITO,
+                    onFinish = { navController.popBackStack(Route.Home.path, false) }
+                )
+            }
+
+            // ADMIN
+            composable(Route.VistaModerador.path) {
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val catalogVm: CatalogViewModel = viewModel(factory = factory)
+
+                val devVm: DeveloperViewModel = viewModel()
+
+                DeveloperScreen(
+                    vm = devVm,
+                    catalogVm = catalogVm,
+                    onCreateProduct = {
+                        navController.navigate(Route.CrearProducto.path)
                     }
                 )
             }
 
-            // Admin/Dev
-            composable(Route.VistaModerador.path) {
-                val developerVm: DeveloperViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
-                val productoVm: ProductoViewModel = androidx.lifecycle.viewmodel.compose.viewModel()
 
-                DeveloperScreen(
-                    vm = developerVm,
-                    vmProducto = productoVm
-                )
-            }
-
-            // Despachador
-            composable(Route.Despachador.path) {
-                DespachadorScreen()
-            }
-
-            // Historial de compras
+            // HISTORIAL
             composable(Route.HistorialCompras.path) {
                 HistorialComprasScreen(navController)
             }
 
-            // Detalle de compra
+            // DETALLE PRODUCTO
             composable(
-                route = "${Route.DetalleCompra.path}/{id}/{fecha}/{total}/{productos}"
+                "${Route.ProductoDetalle.path}?id={id}&nombre={nombre}&precio={precio}&categoria={categoria}"
             ) { backStack ->
-                val id = backStack.arguments?.getString("id")?.toIntOrNull() ?: 0
-                val fecha = java.net.URLDecoder.decode(
-                    backStack.arguments?.getString("fecha") ?: "",
-                    java.nio.charset.StandardCharsets.UTF_8.toString()
-                )
-                val total = backStack.arguments?.getString("total")?.toLongOrNull() ?: 0
-                val productosStr = java.net.URLDecoder.decode(
-                    backStack.arguments?.getString("productos") ?: "",
-                    java.nio.charset.StandardCharsets.UTF_8.toString()
-                )
-                val productos = productosStr.split("|")
 
-                DetalleCompraScreen(
-                    idCompra = id,
-                    fecha = fecha,
-                    total = total,
-                    productos = productos,
-                    navController = navController
-                )
-            }
-
-            // Detalle de producto
-            composable("${Route.ProductoDetalle.path}?id={id}&nombre={nombre}&precio={precio}&categoria={categoria}") { backStack ->
                 val id = backStack.arguments?.getString("id")?.toIntOrNull() ?: -1
-                fun dec(s: String?) = java.net.URLDecoder.decode(
-                    s ?: "",
-                    java.nio.charset.StandardCharsets.UTF_8.toString()
-                )
-
-                val nombre = dec(backStack.arguments?.getString("nombre")).ifBlank { "Producto" }
-                val precio = dec(backStack.arguments?.getString("precio")).ifBlank { "$0" }
-                val categoria =
-                    dec(backStack.arguments?.getString("categoria")).ifBlank { "polera" }
+                fun dec(s: String?) =
+                    java.net.URLDecoder.decode(s ?: "", StandardCharsets.UTF_8.toString())
 
                 DetalleProductoScreen(
                     id = id,
-                    nombre = nombre,
-                    precio = precio,
-                    categoria = categoria,
+                    nombre = dec(backStack.arguments?.getString("nombre")),
+                    precio = dec(backStack.arguments?.getString("precio")),
+                    categoria = dec(backStack.arguments?.getString("categoria")),
                     cartVm = cartVm,
                     onAddedToCart = {
                         navController.navigate(Route.Home.path) {
@@ -283,14 +237,81 @@ fun AppNavGraph(
                 )
             }
 
-            // Olvidé contraseña
+            // FORGOT PASSWORD
             composable(Route.Forgot.path) {
                 ForgotPasswordScreenVm(
                     vm = authViewModel,
                     onDoneGoLogin = {
                         navController.navigate(Route.Login.path) {
-                            launchSingleTop = true
                             popUpTo(Route.Login.path) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            //
+            // ============================================
+            // CATÁLOGO CORREGIDO
+            // ============================================
+            //
+
+            // CREAR PRODUCTO
+            composable(Route.CrearProducto.path) {
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                CreateProductScreen(
+                    vm = vm,
+                    onNext = { id ->
+                        navController.navigate("crear-variante/$id")
+                    }
+                )
+            }
+
+            // CREAR VARIANTE
+            composable(
+                route = Route.CrearVariante.path,
+                arguments = listOf(navArgument("productId") { type = NavType.IntType })
+            ) { backStack ->
+
+                val productId = backStack.arguments?.getInt("productId") ?: 0
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                CreateVariantScreen(
+                    productId = productId,
+                    vm = vm,
+                    onNext = {
+                        navController.navigate("subir-imagen/$productId")
+                    }
+                )
+            }
+
+            // SUBIR IMAGEN
+            composable(
+                route = Route.SubirImagen.path,
+                arguments = listOf(navArgument("productId") { type = NavType.IntType })
+            ) { backStack ->
+
+                val productId = backStack.arguments?.getInt("productId") ?: 0
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                UploadImageScreen(
+                    productId = productId,
+                    vm = vm,
+                    onFinish = {
+                        navController.navigate(Route.VistaModerador.path) {
+                            popUpTo(Route.Home.path) { inclusive = false }
                         }
                     }
                 )

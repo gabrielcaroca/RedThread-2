@@ -121,9 +121,10 @@ class AuthViewModel(
                         email = profile?.email,
                         name = profile?.fullName,
                         userId = profile?.id?.toString(),
-                        // ✅ CORREGIDO: Quitamos .key porque ahora roles es List<String>
-                        role = profile?.roles?.firstOrNull() ?: "CLIENTE"
+                        role = profile?.roles?.firstOrNull() ?: "CLIENTE",
+                        token = rawToken      // ⭐ IMPORTANTE
                     )
+
                 } else {
                     _login.update {
                         it.copy(
@@ -227,9 +228,10 @@ class AuthViewModel(
                         email = profile?.email ?: s.email.trim(),
                         name = profile?.fullName ?: s.name.trim(),
                         userId = profile?.id?.toString(),
-                        // ✅ CORREGIDO: Quitamos .key aquí también
-                        role = profile?.roles?.firstOrNull() ?: "CLIENTE"
+                        role = profile?.roles?.firstOrNull() ?: "CLIENTE",
+                        token = rawToken      // ⭐ IMPORTANTE
                     )
+
                 }
 
                 _register.update { it.copy(isSubmitting = false, success = true) }

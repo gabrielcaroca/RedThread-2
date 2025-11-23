@@ -2,16 +2,19 @@ package com.example.redthread.data.repository
 
 import android.content.Context
 import com.example.redthread.data.AuthStorage
+import com.example.redthread.data.local.SessionPrefs
 import com.example.redthread.data.remote.ApiClient
-import com.example.redthread.data.remote.dto.AuthResponse
-import com.example.redthread.data.remote.dto.LoginRequest
-import com.example.redthread.data.remote.dto.RegisterRequest
-import com.example.redthread.data.remote.dto.UserProfileDto
+import com.example.redthread.data.remote.Dto.AuthResponse
+import com.example.redthread.data.remote.Dto.LoginRequest
+import com.example.redthread.data.remote.Dto.RegisterRequest
+import com.example.redthread.data.remote.Dto.UserProfileDto
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 class AuthRepository(
-    private val context: Context
+    private val context: Context,
+    private val session: SessionPrefs
 ) {
 
     // =========================
@@ -24,7 +27,6 @@ class AuthRepository(
                 val resp = ApiClient.identity.login(req)
 
                 // Guardamos token en segundo plano
-                AuthStorage.saveToken(context, resp.accessToken)
 
                 Result.success(resp)
             } catch (e: Exception) {
@@ -44,7 +46,7 @@ class AuthRepository(
                 println("🔥 Respuesta del registro: $resp")
 
                 // Guardamos token en segundo plano
-                AuthStorage.saveToken(context, resp.accessToken)
+                //AuthStorage.saveToken(context, resp.accessToken) aSDIBASUDASUJDAIDBNISDIUBASIDBASUIBDUI
                 Result.success(resp)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -62,7 +64,7 @@ class AuthRepository(
     suspend fun me(tokenManual: String? = null): Result<UserProfileDto> =
         withContext(Dispatchers.IO) {
             try {
-                val token = tokenManual ?: AuthStorage.getToken(context)
+                val token = tokenManual ?: session.tokenFlow.first()
 
                 if (token == null) {
                     return@withContext Result.failure(
@@ -77,6 +79,7 @@ class AuthRepository(
                 Result.failure(e)
             }
         }
+
 
     // =========================
     // RESET PASSWORD
