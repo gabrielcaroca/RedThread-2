@@ -20,7 +20,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.redthread.domain.enums.UserRole
-import com.example.redthread.data.remote.Dto.AddressDto
+import com.example.redthread.data.remote.dto.AddressDto
 import com.example.redthread.navigation.Route
 import com.example.redthread.ui.theme.*
 import com.example.redthread.ui.viewmodel.AuthHeaderState

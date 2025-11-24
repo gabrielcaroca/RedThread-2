@@ -125,6 +125,7 @@ dependencies {
     //librerias para el manejo de reglas de test
     androidTestImplementation("androidx.test:core-ktx:1.5.0")
     androidTestImplementation("androidx.test:rules:1.5.0")
-    //libreria splash screen
-    implementation("androidx.core:core-splashscreen:1.0.1")
+    // GPS (Fused Location Provider)
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
 }

@@ -1,6 +1,5 @@
 package com.example.redthread.ui.screen
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
@@ -10,19 +9,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
+import com.example.redthread.data.remote.dto.AddressDto
 import com.example.redthread.ui.theme.Black
 import com.example.redthread.ui.theme.TextPrimary
 import com.example.redthread.ui.theme.TextSecondary
 import com.example.redthread.ui.viewmodel.CartViewModel
 import com.example.redthread.ui.viewmodel.PedidoViewModel
 import com.example.redthread.ui.viewmodel.ProfileViewModel
-
-
+import com.example.redthread.ui.viewmodel.ProfileVmFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun CheckoutScreen(
@@ -30,50 +31,74 @@ fun CheckoutScreen(
     onGoPerfil: () -> Unit,
     onPaidSuccess: (pedidoId: Long, total: Int, metodo: MetodoPago) -> Unit
 ) {
-    val profileVm: ProfileViewModel = viewModel()
-    val pedidoVm: PedidoViewModel = viewModel()
+    val items by cartVm.items.collectAsState()
+    val scroll = rememberScrollState()
     val scope = rememberCoroutineScope()
 
-    val profileState by profileVm.state.collectAsState()
-    val items = cartVm.items.collectAsState().value
+    val context = LocalContext.current
+    val profileVm: ProfileViewModel = viewModel(factory = ProfileVmFactory(context))
+    val pedidoVm: PedidoViewModel = viewModel()
 
-    // ============================
-    // CÁLCULO DEL TOTAL
-    // ============================
+    val profileState by profileVm.state.collectAsState()
+
+    LaunchedEffect(Unit) { profileVm.loadAddresses() }
+
     val subtotal = items.sumOf { parsePriceToInt(it.precio) * it.cantidad }
     val iva = (subtotal * 0.19).toInt()
     val total = subtotal + iva
 
-    // Direcciones desde el backend
     val direcciones = profileState.addresses
+    var direccionSeleccionadaId by remember { mutableStateOf<Long?>(null) }
 
-    var direccionSeleccionadaId by remember {
-        mutableStateOf(
-            direcciones.firstOrNull { it.default }?.id
-                ?: direcciones.firstOrNull()?.id
-        )
-    }
-
+    // ✅ Tu enum real es DEBITO / CREDITO
     var metodo by remember { mutableStateOf(MetodoPago.DEBITO) }
+
     var isPaying by remember { mutableStateOf(false) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Black)
+            .verticalScroll(scroll)
             .padding(16.dp)
-            .verticalScroll(rememberScrollState())
     ) {
 
-        // ============================
-        // TÍTULO
-        // ============================
-        Text("Checkout", color = TextPrimary, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(
+            "Checkout",
+            fontWeight = FontWeight.Bold,
+            fontSize = 22.sp,
+            color = TextPrimary
+        )
+
         Spacer(Modifier.height(12.dp))
 
         // ============================
-        // RESUMEN DE COMPRA
+        // DIRECCIÓN
+        // ============================
+        Text("Dirección de envío", fontWeight = FontWeight.SemiBold, color = TextPrimary)
+        Spacer(Modifier.height(8.dp))
+
+        if (direcciones.isEmpty()) {
+            Text(
+                "No tienes direcciones. Ve a tu perfil para agregar una.",
+                color = TextSecondary
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(onClick = onGoPerfil) { Text("Ir a Perfil") }
+        } else {
+            direcciones.forEach { dir ->
+                DirectionRadioItem(
+                    dir = dir,
+                    selected = direccionSeleccionadaId == dir.id,
+                    onSelect = { direccionSeleccionadaId = dir.id }
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
+
+        // ============================
+        // RESUMEN
         // ============================
         Card(
             colors = CardDefaults.cardColors(
@@ -88,121 +113,53 @@ fun CheckoutScreen(
                     Text("Subtotal", color = TextSecondary)
                     Text(formatCLP(subtotal), color = TextPrimary)
                 }
+
+                Spacer(Modifier.height(6.dp))
+
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("IVA (19%)", color = TextSecondary)
+                    Text("IVA 19%", color = TextSecondary)
                     Text(formatCLP(iva), color = TextPrimary)
                 }
 
-                Divider(Modifier.padding(vertical = 8.dp), color = TextSecondary.copy(alpha = 0.2f))
+                Divider(Modifier.padding(vertical = 8.dp))
 
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Total", color = TextPrimary, fontWeight = FontWeight.Bold)
+                    Text("Total", color = TextSecondary, fontWeight = FontWeight.Bold)
                     Text(formatCLP(total), color = TextPrimary, fontWeight = FontWeight.Bold)
                 }
             }
         }
 
-        Spacer(Modifier.height(16.dp))
-
-        // ============================
-        // DIRECCIÓN
-        // ============================
-        Text("Dirección de entrega", color = TextPrimary, fontWeight = FontWeight.SemiBold)
-        Spacer(Modifier.height(8.dp))
-
-        if (direcciones.isEmpty()) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.15f)
-                )
-            ) {
-                Column(Modifier.padding(16.dp)) {
-                    Text("No tienes direcciones registradas.", color = TextPrimary)
-                    Spacer(Modifier.height(6.dp))
-                    Text("Agrega una dirección antes de pagar.", color = TextSecondary, fontSize = 12.sp)
-                    Spacer(Modifier.height(10.dp))
-                    Button(onClick = onGoPerfil) {
-                        Text("Agregar dirección")
-                    }
-                }
-            }
-        } else {
-            Column {
-                direcciones.forEach { dir ->
-                    val selected = direccionSeleccionadaId == dir.id
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .selectable(
-                                selected = selected,
-                                onClick = { direccionSeleccionadaId = dir.id },
-                                role = Role.RadioButton
-                            )
-                            .padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selected,
-                            onClick = { direccionSeleccionadaId = dir.id }
-                        )
-
-                        Spacer(Modifier.width(8.dp))
-
-                        Column(Modifier.weight(1f)) {
-                            Text(dir.line1, color = TextPrimary)
-
-                            val extra = listOfNotNull(
-                                dir.city,
-                                dir.state,
-                                dir.country
-                            ).joinToString(" · ")
-
-                            Text(extra, color = TextSecondary, fontSize = 12.sp)
-                        }
-
-                        if (dir.default) {
-                            AssistChip(onClick = {}, label = { Text("Predeterminada") })
-                        }
-                    }
-
-                    Divider(color = TextSecondary.copy(alpha = 0.12f))
-                }
-            }
-        }
-
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(20.dp))
 
         // ============================
         // MÉTODO DE PAGO
         // ============================
-        Text("Método de pago", color = TextPrimary, fontWeight = FontWeight.SemiBold)
+        Text("Método de pago", fontWeight = FontWeight.SemiBold, color = TextPrimary)
         Spacer(Modifier.height(8.dp))
 
-        Column {
-            MetodoPago.values().forEach { m ->
-                val selected = metodo == m
+        MetodoPago.values().forEach { m ->
+            val selected = metodo == m
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = selected,
-                            onClick = { metodo = m },
-                            role = Role.RadioButton
-                        )
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(selected = selected, onClick = { metodo = m })
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (m == MetodoPago.DEBITO) "Débito" else "Crédito",
-                        color = TextPrimary
+            val label = when (m) {
+                MetodoPago.DEBITO -> "Débito"
+                MetodoPago.CREDITO -> "Crédito"
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(
+                        selected = selected,
+                        onClick = { metodo = m },
+                        role = Role.RadioButton
                     )
-                }
-
-                Divider(color = TextSecondary.copy(alpha = 0.12f))
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                RadioButton(selected = selected, onClick = null)
+                Spacer(Modifier.width(8.dp))
+                Text(label, color = TextPrimary)
             }
         }
 
@@ -225,17 +182,20 @@ fun CheckoutScreen(
                     return@Button
                 }
 
-                val dir = direcciones.first { it.id == direccionSeleccionadaId }
-                val totalSnapshot = total
-
+                if (isPaying) return@Button
                 isPaying = true
 
+                val totalSnapshot = total
+
+                // ✅ tu VM espera String
+                val productosSnapshot = items.joinToString("\n") {
+                    "${it.nombre} x${it.cantidad}"
+                }
+
                 scope.launch {
-                    val productosSnapshot = buildString {
-                        items.forEach {
-                            append("- ${it.nombre} (${it.talla}/${it.color}) x${it.cantidad} = ${it.precio}\n")
-                        }
-                    }
+                    delay(1200) // simula pago
+
+                    val dir = direcciones.first { it.id == direccionSeleccionadaId }
 
                     val pedidoId = pedidoVm.createPedidoReturnId(
                         usuario = "Usuario",
@@ -249,8 +209,9 @@ fun CheckoutScreen(
                     onPaidSuccess(pedidoId, totalSnapshot, metodo)
                 }
             },
-            enabled = !isPaying && items.isNotEmpty() && direcciones.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth()
+            enabled = !isPaying,
+            modifier = Modifier.fillMaxWidth(),
+            colors = ButtonDefaults.buttonColors(containerColor = Black)
         ) {
             if (isPaying) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -267,8 +228,41 @@ fun CheckoutScreen(
             Spacer(Modifier.height(10.dp))
             Text(it, color = MaterialTheme.colorScheme.error)
         }
+    }
+}
 
-        Spacer(Modifier.height(40.dp))
+@Composable
+private fun DirectionRadioItem(
+    dir: AddressDto,
+    selected: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected)
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            else MaterialTheme.colorScheme.surface
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp)
+                .selectable(selected = selected, onClick = onSelect),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            RadioButton(selected = selected, onClick = null)
+            Spacer(Modifier.width(8.dp))
+            Column {
+                Text(dir.line1, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+                dir.line2?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, color = TextSecondary, fontSize = 12.sp)
+                }
+            }
+        }
     }
 }
 

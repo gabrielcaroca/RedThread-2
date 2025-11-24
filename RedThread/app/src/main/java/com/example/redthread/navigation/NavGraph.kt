@@ -9,10 +9,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import androidx.navigation.NavType
 import com.example.redthread.ui.components.AppTopBar
 import com.example.redthread.ui.screen.*
 import com.example.redthread.ui.screen.catalog.CreateProductScreen
@@ -207,10 +207,43 @@ fun AppNavGraph(
                 )
             }
 
+            // ✅ DESPACHADOR (antes NO existía, por eso crasheaba)
+            composable(Route.Despachador.path) {
+                DespachadorScreen()
+            }
 
             // HISTORIAL
             composable(Route.HistorialCompras.path) {
                 HistorialComprasScreen(navController)
+            }
+
+            // ✅ DETALLE COMPRA (la usas desde Historial)
+            composable(
+                route = Route.DetalleCompra.path + "/{id}/{fecha}/{total}/{productos}",
+                arguments = listOf(
+                    navArgument("id") { type = NavType.IntType },
+                    navArgument("fecha") { type = NavType.StringType },
+                    navArgument("total") { type = NavType.LongType },
+                    navArgument("productos") { type = NavType.StringType }
+                )
+            ) { backStack ->
+                val id = backStack.arguments?.getInt("id") ?: 0
+                val fecha = backStack.arguments?.getString("fecha") ?: ""
+                val total = backStack.arguments?.getLong("total") ?: 0L
+                val productosRaw = backStack.arguments?.getString("productos") ?: ""
+
+                val productos = if (productosRaw.isBlank()) emptyList()
+                else productosRaw.split("|").map {
+                    java.net.URLDecoder.decode(it, StandardCharsets.UTF_8.toString())
+                }
+
+                DetalleCompraScreen(
+                    idCompra = id,
+                    fecha = fecha,
+                    total = total,
+                    productos = productos,
+                    navController = navController
+                )
             }
 
             // DETALLE PRODUCTO
@@ -251,7 +284,7 @@ fun AppNavGraph(
 
             //
             // ============================================
-            // CATÁLOGO CORREGIDO
+            // CATÁLOGO
             // ============================================
             //
 

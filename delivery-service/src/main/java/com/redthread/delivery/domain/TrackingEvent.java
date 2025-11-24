@@ -6,13 +6,16 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-@Entity @Table(name = "tracking_events")
+@Entity
+@Table(name = "tracking_events")
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class TrackingEvent {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional=false) @JoinColumn(name="shipment_id")
+    @ManyToOne(optional=false, fetch = FetchType.LAZY)
+    @JoinColumn(name="shipment_id")
     private Shipment shipment;
 
     @Enumerated(EnumType.STRING)
@@ -28,9 +31,11 @@ public class TrackingEvent {
     @Column(length=250)
     private String note;
 
-    @Column(nullable=false)
+    @Column(name="created_at", nullable=false, updatable=false)
     private Instant createdAt;
 
     @PrePersist
-    public void prePersist() { this.createdAt = Instant.now(); }
+    public void prePersist() {
+        if (this.createdAt == null) this.createdAt = Instant.now();
+    }
 }

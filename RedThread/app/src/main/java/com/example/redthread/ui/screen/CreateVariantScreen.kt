@@ -5,7 +5,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.redthread.data.remote.Dto.CreateVariantRequest
+import com.example.redthread.data.remote.dto.CreateVariantRequest
 import com.example.redthread.ui.components.DropdownMenuBox
 import com.example.redthread.ui.viewmodel.CatalogViewModel
 

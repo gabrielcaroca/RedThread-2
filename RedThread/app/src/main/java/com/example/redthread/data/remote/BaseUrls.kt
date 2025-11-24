@@ -3,7 +3,7 @@ package com.example.redthread.data.remote
 object Env {
     // false = emulador (10.0.2.2)
     // true  = telefono USB sin wifi (127.0.0.1 usando adb reverse)
-    const val USE_USB = false
+    const val USE_USB = true
 }
 
 object BaseUrls {

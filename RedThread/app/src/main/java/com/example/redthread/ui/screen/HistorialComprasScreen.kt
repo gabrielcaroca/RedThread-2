@@ -15,23 +15,18 @@ import com.example.redthread.navigation.Route
 import com.example.redthread.ui.theme.TextPrimary
 import com.example.redthread.ui.theme.TextSecondary
 import com.example.redthread.ui.viewmodel.PedidoViewModel
+import java.net.URLEncoder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-// === Función para formatear timestamp a fecha legible ===
-private fun formatFecha(raw: Any): String {
-    val ms = raw.toString().toLongOrNull() ?: return raw.toString()
-    val fmt = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
-    return fmt.format(Date(ms))
-}
-
-
+// ===================================================================
+//    HISTORIAL DE COMPRAS (LOCAL - ROOM)
+// ===================================================================
 @Composable
-fun HistorialComprasScreen(
-    navController: NavHostController,
-    pedidoVm: PedidoViewModel = viewModel()
-) {
+fun HistorialComprasScreen(navController: NavHostController) {
+
+    val pedidoVm: PedidoViewModel = viewModel()
     val pedidos by pedidoVm.pedidos.collectAsState()
 
     Column(
@@ -39,28 +34,37 @@ fun HistorialComprasScreen(
             .fillMaxSize()
             .padding(16.dp)
     ) {
+
         Text(
             "Historial de Compras",
+            style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.titleLarge
+            color = TextPrimary
         )
+
         Spacer(Modifier.height(12.dp))
 
         if (pedidos.isEmpty()) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Aún no has realizado compras.", color = TextSecondary)
+                Text("Aún no tienes compras.", color = TextSecondary)
             }
         } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 items(pedidos) { pedido ->
-                    Card(
-                        Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(MaterialTheme.colorScheme.surfaceVariant)
-                    ) {
+                    Card {
                         Column(Modifier.padding(12.dp)) {
-                            // ✅ Mostrar fecha formateada
+
                             Text(
-                                text = "Fecha: ${formatFecha(pedido.fecha)}",
+                                text = "Compra #${pedido.id}",
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+
+                            // ✅ no asumimos tipo ni nulabilidad: siempre a String
+                            val fechaRaw = pedido.fecha.toString()
+
+                            Text(
+                                text = "Fecha: ${formatFecha(fechaRaw)}",
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
                             )
@@ -69,7 +73,9 @@ fun HistorialComprasScreen(
                                 "Total: $${"%,d".format(pedido.total)}",
                                 color = TextPrimary
                             )
+
                             Spacer(Modifier.height(8.dp))
+
                             Text(
                                 "Productos:",
                                 fontWeight = FontWeight.SemiBold,
@@ -78,25 +84,25 @@ fun HistorialComprasScreen(
 
                             val productosList =
                                 pedido.productos.split("\n").filter { it.isNotBlank() }
+
                             productosList.forEach { p ->
                                 Text("• $p", color = TextSecondary)
                             }
 
                             Spacer(Modifier.height(8.dp))
+
                             Button(
                                 onClick = {
-                                    val productosStr = productosList
-                                        .joinToString("|")
-                                        .replace(" ", "%20")
-                                        .replace("\n", "%0A")
-                                        .replace("/", "%2F")
-                                        .replace(":", "%3A")
-                                        .replace(",", "%2C")
+                                    // ✅ encoding seguro con UTF-8 sin imports extra
+                                    val productosStr = URLEncoder.encode(
+                                        productosList.joinToString("|"),
+                                        Charsets.UTF_8.name()
+                                    )
 
-                                    val fechaEncoded = pedido.fecha.toString()
-                                        .replace(" ", "%20")
-                                        .replace(":", "%3A")
-                                        .replace("/", "%2F")
+                                    val fechaEncoded = URLEncoder.encode(
+                                        fechaRaw,
+                                        Charsets.UTF_8.name()
+                                    )
 
                                     navController.navigate(
                                         "${Route.DetalleCompra.path}/${pedido.id}/$fechaEncoded/${pedido.total}/$productosStr"
@@ -112,5 +118,20 @@ fun HistorialComprasScreen(
                 }
             }
         }
+    }
+}
+
+// ===================================================================
+//    UTILIDADES
+// ===================================================================
+// Si tu fecha ya viene en otro formato, esto solo la devuelve tal cual.
+private fun formatFecha(raw: String): String {
+    return try {
+        val input = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val date: Date? = input.parse(raw)
+        val output = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
+        if (date != null) output.format(date) else raw
+    } catch (_: Exception) {
+        raw
     }
 }

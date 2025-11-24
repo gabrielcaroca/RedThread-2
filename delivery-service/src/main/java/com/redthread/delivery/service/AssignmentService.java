@@ -1,7 +1,7 @@
 package com.redthread.delivery.service;
 
-import com.redthread.delivery.domain.*;
+import com.redthread.delivery.domain.ShipmentAssignment;
 
 public interface AssignmentService {
-    ShipmentAssignment assign(Long shipmentId, Long driverId, Long vehicleId);
+    ShipmentAssignment assign(Long shipmentId, Long assignedUserId);
 }

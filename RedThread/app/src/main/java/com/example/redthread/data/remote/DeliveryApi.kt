@@ -1,34 +1,49 @@
 package com.example.redthread.data.remote
 
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.*
 
 interface DeliveryApi {
 
-    @GET("api/rutas/activas")
-    suspend fun getRutasActivas(): List<RutaDto>
+    // RUTAS
+    @GET("routes/active")
+    suspend fun getActiveRoutes(): List<RouteDto>
 
-    @POST("api/rutas/{rutaId}/tomar")
-    suspend fun tomarRuta(@Path("rutaId") rutaId: Long): RutaDto
+    @POST("routes/{id}/take")
+    suspend fun takeRoute(@Path("id") id: Long): RouteDto
 
-    @GET("api/rutas/{rutaId}/pedidos")
-    suspend fun getPedidosDeRuta(@Path("rutaId") rutaId: Long): List<PedidoDto>
+    @GET("routes/{id}/shipments")
+    suspend fun getShipmentsByRoute(@Path("id") id: Long): List<ShipmentDto>
 
-    @POST("api/pedidos/{pedidoId}/recoger")
-    suspend fun recogerPedido(@Path("pedidoId") pedidoId: Long): PedidoDto
+    // SHIPMENTS acciones
+    @POST("shipments/{id}/start")
+    suspend fun startShipment(@Path("id") id: Long): ShipmentDto
 
+    // Confirmar entrega con evidencia + gps
     @Multipart
-    @POST("api/pedidos/{pedidoId}/entregar")
-    suspend fun confirmarEntrega(
-        @Path("pedidoId") pedidoId: Long,
-        @Part foto: MultipartBody.Part
-    ): PedidoDto
+    @POST("shipments/{id}/delivered")
+    suspend fun delivered(
+        @Path("id") id: Long,
+        @Part("receiverName") receiverName: RequestBody,
+        @Part("latitude") latitude: RequestBody?,
+        @Part("longitude") longitude: RequestBody?,
+        @Part photo: MultipartBody.Part
+    ): ShipmentDto
 
+    // Fallo con evidencia + gps
     @Multipart
-    @POST("api/pedidos/{pedidoId}/devolver")
-    suspend fun devolverPedido(
-        @Path("pedidoId") pedidoId: Long,
-        @Part("motivo") motivo: String,
-        @Part foto: MultipartBody.Part
-    ): PedidoDto
+    @POST("shipments/{id}/fail")
+    suspend fun fail(
+        @Path("id") id: Long,
+        @Part("note") note: RequestBody,
+        @Part("latitude") latitude: RequestBody?,
+        @Part("longitude") longitude: RequestBody?,
+        @Part photo: MultipartBody.Part
+    ): ShipmentDto
+
+    // Crear ruta (admin)
+    @POST("routes")
+    suspend fun createRoute(@Body req: CreateRouteRequest): RouteDto
+
 }

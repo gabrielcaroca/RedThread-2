@@ -14,7 +14,7 @@ import com.example.redthread.ui.viewmodel.DeveloperViewModel
 import com.example.redthread.ui.viewmodel.PedidoViewModel
 import com.example.redthread.ui.viewmodel.RutaViewModel
 import com.example.redthread.ui.viewmodel.CatalogViewModel
-import com.example.redthread.data.remote.Dto.ProductDto
+import com.example.redthread.data.remote.dto.ProductDto
 
 enum class DevTab { PRODUCTOS, PEDIDOS, RUTAS }
 
@@ -154,12 +154,11 @@ fun OrdersTab(
             onClick = {
                 if (seleccionados.isNotEmpty()) {
                     val nombreRuta = "Ruta${System.currentTimeMillis() % 1000}"
-                    vmRuta.crearRuta(nombreRuta, seleccionados)
+                    vmRuta.crearRuta(nombreRuta, seleccionados)         // <-- LOCAL
                     seleccionados.forEach { vmPedido.actualizarEstadoPedido(it, "asignado") }
                     seleccionados.clear()
                 }
-            },
-            enabled = seleccionados.isNotEmpty()
+            }
         ) {
             Text("Crear ruta con seleccionados")
         }

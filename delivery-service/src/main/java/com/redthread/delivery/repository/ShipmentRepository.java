@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface ShipmentRepository extends JpaRepository<Shipment, Long> {
     List<Shipment> findByUserIdOrderByCreatedAtDesc(Long userId);
+    List<Shipment> findByRouteId(Long routeId);
+    List<Shipment> findByAssignedUserIdOrderByUpdatedAtDesc(Long assignedUserId);
 }

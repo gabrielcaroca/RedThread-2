@@ -1,7 +1,7 @@
 package com.example.redthread.data.repository
 
 import com.example.redthread.data.remote.CatalogApi
-import com.example.redthread.data.remote.Dto.*
+import com.example.redthread.data.remote.dto.*
 import okhttp3.MultipartBody
 
 class CatalogRepository(private val api: CatalogApi) {

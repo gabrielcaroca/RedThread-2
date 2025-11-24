@@ -3,8 +3,9 @@ package com.example.redthread.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import com.example.redthread.data.repository.AddressRepository
+import com.example.redthread.data.local.SessionPrefs
 import com.example.redthread.data.remote.ApiClient
+import com.example.redthread.data.repository.AddressRepository
 
 class ProfileVmFactory(private val context: Context) : ViewModelProvider.Factory {
 
@@ -12,12 +13,15 @@ class ProfileVmFactory(private val context: Context) : ViewModelProvider.Factory
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
 
-            // Repositorio con API correcta
-            val repo = AddressRepository(ApiClient.address, context)
+            val sessionPrefs = SessionPrefs(context.applicationContext)
+
+            val repo = AddressRepository(
+                api = ApiClient.address,        // baseUrl orders-service OK
+                sessionPrefs = sessionPrefs
+            )
 
             return ProfileViewModel(repo) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
-

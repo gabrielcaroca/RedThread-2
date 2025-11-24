@@ -27,6 +27,10 @@ management:
       show-details: never
 
 app:
+  rates:
+    fixed: 1900
+  webhook:
+    enabled: false
   security:
     jwt:
       secret: 8bc5013076fe8a59ccb4ad731e17b757002f0f07588444d66bb95b8c4d32b4e1
@@ -37,10 +41,6 @@ app:
   http:
     connect-timeout-ms: 4000
     read-timeout-ms: 8000
-  rates:
-    default-base: 2990       # tarifa flat si no matchea zona
-  webhook:
-    enabled: false           # si true: intenta notificar al order-service
 
 logging:
   level:

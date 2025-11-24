@@ -1,6 +1,6 @@
 package com.example.redthread.data.remote
 
-import com.example.redthread.data.remote.Dto.*
+import com.example.redthread.data.remote.dto.*
 import okhttp3.MultipartBody
 import retrofit2.http.*
 

@@ -3,9 +3,9 @@ package com.example.redthread.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.redthread.data.remote.Dto.AddressDto
-import com.example.redthread.data.remote.Dto.CreateAddressRequest
-import com.example.redthread.data.remote.Dto.UpdateAddressRequest
+import com.example.redthread.data.remote.dto.AddressDto
+import com.example.redthread.data.remote.dto.CreateAddressRequest
+import com.example.redthread.data.remote.dto.UpdateAddressRequest
 import com.example.redthread.data.repository.AddressRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

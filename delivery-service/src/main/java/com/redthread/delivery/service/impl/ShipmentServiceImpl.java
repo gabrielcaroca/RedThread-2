@@ -1,72 +1,71 @@
 package com.redthread.delivery.service.impl;
 
 import com.redthread.delivery.domain.*;
-import com.redthread.delivery.dto.shipment.*;
+import com.redthread.delivery.dto.shipment.CreateShipmentRequest;
+import com.redthread.delivery.dto.shipment.TrackRequest;
 import com.redthread.delivery.integration.OrderClient;
-import com.redthread.delivery.repository.*;
+import com.redthread.delivery.repository.ShipmentAssignmentRepository;
+import com.redthread.delivery.repository.ShipmentRepository;
+import com.redthread.delivery.repository.TrackingEventRepository;
 import com.redthread.delivery.service.ShipmentService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Mono;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.*;
 import java.util.*;
-import java.util.regex.Pattern;
 
-@Service @Transactional
+@Service
+@Transactional
+@RequiredArgsConstructor
 public class ShipmentServiceImpl implements ShipmentService {
 
     private final ShipmentRepository shipmentRepo;
-    private final GeoZoneRepository zoneRepo;
-    private final RateRepository rateRepo;
     private final TrackingEventRepository trackingRepo;
+    private final ShipmentAssignmentRepository assignmentRepo;
     private final OrderClient orderClient;
 
-    @Value("${app.rates.default-base:2990}")
-    private BigDecimal defaultBase;
+    @Value("${app.rates.fixed:1900}")
+    private BigDecimal fixedPrice;
 
     @Value("${app.webhook.enabled:false}")
     private boolean webhookEnabled;
 
-    public ShipmentServiceImpl(ShipmentRepository shipmentRepo, GeoZoneRepository zoneRepo, RateRepository rateRepo,
-                               TrackingEventRepository trackingRepo, OrderClient orderClient) {
-        this.shipmentRepo = shipmentRepo;
-        this.zoneRepo = zoneRepo;
-        this.rateRepo = rateRepo;
-        this.trackingRepo = trackingRepo;
-        this.orderClient = orderClient;
-    }
+    @Value("${app.evidence.dir:./evidence}")
+    private String evidenceDir;
 
     @Override
+    @SuppressWarnings("unchecked")
     public Shipment createFromOrder(CreateShipmentRequest req, Long currentUserId, Jwt jwt) {
-        // 1) Llamar a Order-Service con el mismo bearer
-        Map<String, Object> order = orderClient.getOrderById(req.orderId(), jwt).blockOptional()
+
+        Map<String, Object> order = orderClient.getOrderById(req.orderId(), jwt)
+                .blockOptional()
                 .orElseThrow(() -> new IllegalArgumentException("Order not found"));
 
-        // 2) Verificar owner
         Long ownerId = extractLong(order.get("userId"));
         if (ownerId == null || !ownerId.equals(currentUserId)) {
             throw new SecurityException("Order does not belong to current user");
         }
 
-        // 3) Direccion desde order
         Map<String, Object> address = (Map<String, Object>) order.get("shippingAddress");
         if (address == null) throw new IllegalArgumentException("Order missing shipping address");
 
-        String line1 = Objects.toString(address.get("line1"), null);
-        String line2 = (String) address.get("line2");
-        String city = Objects.toString(address.get("city"), "");
+        String line1 = (String) address.get("addressLine1");
+        String line2 = (String) address.get("addressLine2");
+        String city = (String) address.get("city");
         String state = (String) address.get("state");
         String zip = (String) address.get("zip");
         String country = Objects.toString(address.get("country"), "CL");
-        if (line1 == null || city.isBlank() || country.isBlank())
-            throw new IllegalArgumentException("Invalid address");
 
-        // 4) Determinar zona/tarifa
-        GeoZone zone = resolveZone(city, zip);
-        BigDecimal price = zone != null ? resolveRate(zone) : defaultBase;
+        if (line1 == null || city == null || city.isBlank() || country.isBlank()) {
+            throw new IllegalArgumentException("Invalid address");
+        }
 
         Shipment s = Shipment.builder()
                 .orderId(req.orderId())
@@ -77,50 +76,42 @@ public class ShipmentServiceImpl implements ShipmentService {
                 .state(state)
                 .zip(zip)
                 .country(country)
-                .zone(zone)
                 .status(DeliveryStatus.PENDING_PICKUP)
-                .totalPrice(price)
+                .totalPrice(fixedPrice)
                 .build();
+
         return shipmentRepo.save(s);
-    }
-
-    private GeoZone resolveZone(String city, String zip) {
-        List<GeoZone> zones = zoneRepo.findAll();
-        for (GeoZone z : zones) {
-            boolean matchCity = (z.getCity() != null && !z.getCity().isBlank() && z.getCity().equalsIgnoreCase(city));
-            boolean matchZip = false;
-            if (z.getZipPattern() != null && !z.getZipPattern().isBlank() && zip != null) {
-                matchZip = Pattern.compile(z.getZipPattern()).matcher(zip).matches();
-            }
-            if (matchCity || matchZip) return z;
-        }
-        return null;
-    }
-
-    private BigDecimal resolveRate(GeoZone zone) {
-        return rateRepo.findByZoneIdAndIsActiveTrue(zone.getId()).stream()
-                .findFirst()
-                .map(Rate::getBasePrice)
-                .orElse(defaultBase);
     }
 
     private Long extractLong(Object v) {
         if (v == null) return null;
         if (v instanceof Number n) return n.longValue();
-        try { return Long.parseLong(String.valueOf(v)); } catch (Exception e) { return null; }
+        try { return Long.parseLong(String.valueOf(v)); }
+        catch (Exception e) { return null; }
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public List<Shipment> listMine(Long currentUserId, boolean isAdmin) {
         if (isAdmin) return shipmentRepo.findAll();
         return shipmentRepo.findByUserIdOrderByCreatedAtDesc(currentUserId);
     }
 
-    @Override @Transactional(readOnly = true)
+    @Override
+    @Transactional(readOnly = true)
     public Shipment getFor(Long id, Long currentUserId, boolean isAdmin) {
-        Shipment s = shipmentRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("Shipment not found"));
-        if (!isAdmin && !Objects.equals(s.getUserId(), currentUserId))
-            throw new SecurityException("Forbidden");
+        Shipment s = shipmentRepo.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Shipment not found"));
+
+        if (isAdmin) return s;
+
+        if (Objects.equals(s.getUserId(), currentUserId)) return s;
+
+        if (s.getAssignedUserId() != null && s.getAssignedUserId().equals(currentUserId)) return s;
+
+        boolean assigned = assignmentRepo.existsByAssignedUserIdAndShipmentId(currentUserId, s.getId());
+        if (!assigned) throw new SecurityException("Forbidden");
+
         return s;
     }
 
@@ -128,64 +119,170 @@ public class ShipmentServiceImpl implements ShipmentService {
     public Shipment start(Long id, Long currentUserId, boolean isAdmin) {
         Shipment s = getFor(id, currentUserId, isAdmin);
         s.setStatus(DeliveryStatus.IN_TRANSIT);
-        return shipmentRepo.save(s);
+        Shipment saved = shipmentRepo.save(s);
+
+        trackingRepo.save(TrackingEvent.builder()
+                .shipment(saved)
+                .status(DeliveryStatus.IN_TRANSIT)
+                .note("Picked up / started")
+                .build());
+
+        return saved;
+    }
+
+    private String storeEvidenceFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) throw new IllegalArgumentException("Photo is required");
+        try {
+            Path dir = Paths.get(evidenceDir).toAbsolutePath().normalize();
+            Files.createDirectories(dir);
+
+            String ext = StringUtils.getFilenameExtension(file.getOriginalFilename());
+            String name = UUID.randomUUID() + (ext == null ? "" : ("." + ext));
+            Path target = dir.resolve(name);
+
+            try (var in = file.getInputStream()) {
+                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            return "/evidence/" + name;
+        } catch (IOException e) {
+            throw new RuntimeException("Could not store evidence file", e);
+        }
     }
 
     @Override
-    public Shipment delivered(Long id, String note, Long currentUserId, boolean isAdmin, Jwt jwt) {
+    public Shipment delivered(Long id,
+                             String receiverName,
+                             String note,
+                             MultipartFile photo,
+                             BigDecimal latitude,
+                             BigDecimal longitude,
+                             Long currentUserId,
+                             boolean isAdmin,
+                             Jwt jwt) {
         Shipment s = getFor(id, currentUserId, isAdmin);
+
+        if (receiverName == null || receiverName.isBlank()) {
+            throw new IllegalArgumentException("receiverName is required");
+        }
+
+        String evidenceUrl = storeEvidenceFile(photo);
+
         s.setStatus(DeliveryStatus.DELIVERED);
-        shipmentRepo.save(s);
-        TrackingEvent te = TrackingEvent.builder()
-                .shipment(s).status(DeliveryStatus.DELIVERED).note(note).build();
-        trackingRepo.save(te);
-        if (webhookEnabled) orderClient.postDeliveryStatus(s.getOrderId(), "DELIVERED", note, jwt).subscribe();
-        return s;
+        s.setReceiverName(receiverName.trim());
+        s.setNote(note);
+        s.setEvidenceUrl(evidenceUrl);
+
+        Shipment saved = shipmentRepo.save(s);
+
+        trackingRepo.save(TrackingEvent.builder()
+                .shipment(saved)
+                .status(DeliveryStatus.DELIVERED)
+                .latitude(latitude)
+                .longitude(longitude)
+                .note(note)
+                .build());
+
+        if (webhookEnabled) {
+            orderClient.postDeliveryStatus(saved.getOrderId(), "DELIVERED", note, jwt).subscribe();
+        }
+
+        return saved;
     }
 
     @Override
-    public Shipment fail(Long id, String note, Long currentUserId, boolean isAdmin, Jwt jwt) {
+    public Shipment fail(Long id,
+                         String note,
+                         MultipartFile photo,
+                         BigDecimal latitude,
+                         BigDecimal longitude,
+                         Long currentUserId,
+                         boolean isAdmin,
+                         Jwt jwt) {
         Shipment s = getFor(id, currentUserId, isAdmin);
+
+        String evidenceUrl = storeEvidenceFile(photo);
+
         s.setStatus(DeliveryStatus.FAILED);
-        shipmentRepo.save(s);
-        TrackingEvent te = TrackingEvent.builder()
-                .shipment(s).status(DeliveryStatus.FAILED).note(note).build();
-        trackingRepo.save(te);
-        if (webhookEnabled) orderClient.postDeliveryStatus(s.getOrderId(), "FAILED", note, jwt).subscribe();
-        return s;
+        s.setNote(note);
+        s.setEvidenceUrl(evidenceUrl);
+
+        Shipment saved = shipmentRepo.save(s);
+
+        trackingRepo.save(TrackingEvent.builder()
+                .shipment(saved)
+                .status(DeliveryStatus.FAILED)
+                .latitude(latitude)
+                .longitude(longitude)
+                .note(note)
+                .build());
+
+        if (webhookEnabled) {
+            orderClient.postDeliveryStatus(saved.getOrderId(), "FAILED", note, jwt).subscribe();
+        }
+
+        return saved;
     }
 
     @Override
     public Shipment cancel(Long id, Long currentUserId, boolean isAdmin) {
         Shipment s = getFor(id, currentUserId, isAdmin);
-        if (s.getStatus() == DeliveryStatus.DELIVERED || s.getStatus() == DeliveryStatus.FAILED)
+
+        if (s.getStatus() == DeliveryStatus.DELIVERED || s.getStatus() == DeliveryStatus.FAILED) {
             throw new IllegalStateException("Cannot cancel a completed shipment");
+        }
+
         s.setStatus(DeliveryStatus.CANCELLED);
-        return shipmentRepo.save(s);
+        Shipment saved = shipmentRepo.save(s);
+
+        trackingRepo.save(TrackingEvent.builder()
+                .shipment(saved)
+                .status(DeliveryStatus.CANCELLED)
+                .note("Cancelled")
+                .build());
+
+        return saved;
     }
 
     @Override
     public TrackingEvent track(Long id, TrackRequest req, Long currentUserId, boolean isAdmin) {
         Shipment s = getFor(id, currentUserId, isAdmin);
-        if (req.status() != null) {
-            s.setStatus(req.status());
-            shipmentRepo.save(s);
-        }
-        var te = TrackingEvent.builder()
+
+        BigDecimal lat = parseDecimal(req.latitude());
+        BigDecimal lng = parseDecimal(req.longitude());
+
+        TrackingEvent te = TrackingEvent.builder()
                 .shipment(s)
-                .status(req.status())
+                .status(req.status() == null ? s.getStatus() : req.status())
+                .latitude(lat)
+                .longitude(lng)
                 .note(req.note())
                 .build();
-        if (req.latitude() != null && !req.latitude().isBlank())
-            te.setLatitude(new java.math.BigDecimal(req.latitude()));
-        if (req.longitude() != null && !req.longitude().isBlank())
-            te.setLongitude(new java.math.BigDecimal(req.longitude()));
+
         return trackingRepo.save(te);
     }
 
-    @Override @Transactional(readOnly = true)
+private BigDecimal parseDecimal(String v) {
+    if (v == null || v.isBlank()) return null;
+    try {
+        return new BigDecimal(v.trim());
+    } catch (Exception e) {
+        return null;
+    }
+}
+
+
+    @Override
+    @Transactional(readOnly = true)
     public List<TrackingEvent> listTracking(Long id, Long currentUserId, boolean isAdmin) {
         Shipment s = getFor(id, currentUserId, isAdmin);
         return trackingRepo.findByShipmentIdOrderByCreatedAtAsc(s.getId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<Shipment> listAssignedToMe(Long currentUserId, boolean isAdmin) {
+        if (isAdmin) return shipmentRepo.findAll();
+        return shipmentRepo.findByAssignedUserIdOrderByUpdatedAtDesc(currentUserId);
     }
 }

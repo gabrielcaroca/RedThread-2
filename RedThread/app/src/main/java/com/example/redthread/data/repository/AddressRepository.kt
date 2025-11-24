@@ -1,19 +1,23 @@
 package com.example.redthread.data.repository
 
-import android.content.Context
-import com.example.redthread.data.AuthStorage
+import com.example.redthread.data.local.SessionPrefs
 import com.example.redthread.data.remote.AddressApi
-import com.example.redthread.data.remote.Dto.*
+import com.example.redthread.data.remote.dto.AddressDto
+import com.example.redthread.data.remote.dto.CreateAddressRequest
+import com.example.redthread.data.remote.dto.UpdateAddressRequest
+import kotlinx.coroutines.flow.first
 
 class AddressRepository(
     private val api: AddressApi,
-    private val context: Context // 👈 Agregamos esto para acceder al AuthStorage
+    private val sessionPrefs: SessionPrefs
 ) {
 
-    // Función auxiliar para obtener el token o lanzar error si no hay sesión
+    // Obtiene token desde SessionPrefs (la fuente real de sesión)
     private suspend fun getTokenHeader(): String {
-        val token = AuthStorage.getToken(context)
-            ?: throw IllegalStateException("Error: No hay token de sesión guardado.")
+        val token = sessionPrefs.tokenFlow.first() ?: ""
+        if (token.isBlank()) {
+            throw IllegalStateException("Error: No hay token de sesión guardado.")
+        }
         return "Bearer $token"
     }
 

@@ -5,24 +5,31 @@ import lombok.*;
 
 import java.time.Instant;
 
-@Entity @Table(name = "shipment_assignments")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Entity
+@Table(name = "shipment_assignments")
+@Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class ShipmentAssignment {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional=false) @JoinColumn(name="shipment_id")
+    @ManyToOne(optional=false, fetch = FetchType.LAZY)
+    @JoinColumn(name = "shipment_id", nullable = false)
     private Shipment shipment;
 
-    @ManyToOne(optional=false) @JoinColumn(name="driver_id")
-    private Driver driver;
+    // userId del despachador en identity-service
+    @Column(name = "assigned_user_id", nullable = false)
+    private Long assignedUserId;
 
-    @ManyToOne @JoinColumn(name="vehicle_id")
-    private Vehicle vehicle;
-
-    @Column(nullable=false)
+    @Column(name="assigned_at", nullable = false, updatable=false)
     private Instant assignedAt;
 
     @PrePersist
-    public void prePersist() { this.assignedAt = Instant.now(); }
+    public void prePersist() {
+        if (this.assignedAt == null) this.assignedAt = Instant.now();
+    }
 }

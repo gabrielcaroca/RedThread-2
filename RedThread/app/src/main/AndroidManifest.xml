@@ -7,6 +7,10 @@
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- GPS nativo-->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
     <application
         android:name=".App"
         android:usesCleartextTraffic="true"
@@ -29,7 +33,7 @@
             </intent-filter>
         </activity>
 
-        <!-- ✅ FileProvider para cámara nativa -->
+        <!-- cámara nativa -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

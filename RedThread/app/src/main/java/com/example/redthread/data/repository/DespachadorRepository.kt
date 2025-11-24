@@ -1,43 +1,53 @@
 package com.example.redthread.data.repository
 
 import com.example.redthread.data.remote.ApiClient
+import com.example.redthread.data.remote.DeliveryApi
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
-import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 
-class DespachadorRepository {
+class DespachadorRepository(
+    private val api: DeliveryApi = ApiClient.delivery
+) {
+    suspend fun rutasActivas() = api.getActiveRoutes()
+    suspend fun tomarRuta(id: Long) = api.takeRoute(id)
+    suspend fun shipmentsDeRuta(routeId: Long) = api.getShipmentsByRoute(routeId)
 
-    suspend fun rutasActivas() =
-        ApiClient.delivery.getRutasActivas()
+    suspend fun startShipment(id: Long) = api.startShipment(id)
 
-    suspend fun tomarRuta(rutaId: Long) =
-        ApiClient.delivery.tomarRuta(rutaId)
+    suspend fun delivered(
+        id: Long,
+        receiverName: String,
+        evidencia: File,
+        lat: Double?,
+        lng: Double?
+    ) = api.delivered(
+        id = id,
+        receiverName = receiverName.toRequestBody("text/plain".toMediaTypeOrNull()),
+        latitude = lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull()),
+        longitude = lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull()),
+        photo = evidencia.toMultipart("photo")
+    )
 
-    suspend fun pedidosDeRuta(rutaId: Long) =
-        ApiClient.delivery.getPedidosDeRuta(rutaId)
+    suspend fun fail(
+        id: Long,
+        note: String,
+        evidencia: File,
+        lat: Double?,
+        lng: Double?
+    ) = api.fail(
+        id = id,
+        note = note.toRequestBody("text/plain".toMediaTypeOrNull()),
+        latitude = lat?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull()),
+        longitude = lng?.toString()?.toRequestBody("text/plain".toMediaTypeOrNull()),
+        photo = evidencia.toMultipart("photo")
+    )
 
-    suspend fun recogerPedido(pedidoId: Long) =
-        ApiClient.delivery.recogerPedido(pedidoId)
-
-    suspend fun confirmarEntrega(id: Long, file: File) =
-        ApiClient.delivery.confirmarEntrega(
-            id,
-            MultipartBody.Part.createFormData(
-                "foto",
-                file.name,
-                file.asRequestBody("image/jpeg".toMediaType())
-            )
-        )
-
-    suspend fun devolverPedido(id: Long, motivo: String, file: File) =
-        ApiClient.delivery.devolverPedido(
-            id,
-            motivo,
-            MultipartBody.Part.createFormData(
-                "foto",
-                file.name,
-                file.asRequestBody("image/jpeg".toMediaType())
-            )
-        )
+    private fun File.toMultipart(partName: String): MultipartBody.Part {
+        val reqBody: RequestBody = this.asRequestBody("image/*".toMediaTypeOrNull())
+        return MultipartBody.Part.createFormData(partName, this.name, reqBody)
+    }
 }

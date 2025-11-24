@@ -34,6 +34,7 @@ import com.example.redthread.ui.theme.TextSecondary
 import com.example.redthread.ui.viewmodel.DespachadorViewModel
 import com.example.redthread.ui.viewmodel.Pedido
 import com.example.redthread.ui.viewmodel.Ruta
+import com.google.android.gms.location.LocationServices
 import java.io.File
 
 @Composable
@@ -43,9 +44,7 @@ fun DespachadorScreen(vm: DespachadorViewModel = viewModel()) {
 
     Box(Modifier.fillMaxSize().background(Black)) {
 
-        // =========================
-        // 1) Si no hay ruta tomada, mostrar rutas activas
-        // =========================
+        // 1) Si no hay ruta tomada, mostrar rutas activas desde backend
         if (vm.rutaSeleccionada.value == null) {
             Column(Modifier.fillMaxSize().padding(16.dp)) {
                 Text(
@@ -84,9 +83,7 @@ fun DespachadorScreen(vm: DespachadorViewModel = viewModel()) {
             return@Box
         }
 
-        // =========================
         // 2) Panel con ruta ya asignada
-        // =========================
         Column(Modifier.fillMaxSize().padding(16.dp)) {
             val rutaActual = vm.rutaSeleccionada.value?.nombre ?: "Sin ruta"
             Text(
@@ -142,20 +139,18 @@ fun DespachadorScreen(vm: DespachadorViewModel = viewModel()) {
             }
         }
 
-        // =========================
         // 3) Detalle expandido
-        // =========================
         pedidoEnDetalle?.let { pedido ->
             DetallePedidoExpandido(
                 pedido = pedido,
                 esRetorno = etapa == "Retorno",
                 onCerrar = { pedidoEnDetalle = null },
-                onConfirmar = { file ->
-                    vm.confirmarEntrega(pedido.id, file)
+                onConfirmar = { receiver, file, lat, lng ->
+                    vm.confirmarEntrega(pedido.id, receiver, file, lat, lng)
                     pedidoEnDetalle = null
                 },
-                onDevolver = { motivo, file ->
-                    vm.marcarDevuelto(pedido.id, motivo, file)
+                onDevolver = { motivo, file, lat, lng ->
+                    vm.marcarDevuelto(pedido.id, motivo, file, lat, lng)
                     pedidoEnDetalle = null
                 }
             )
@@ -176,6 +171,7 @@ fun RutaCard(ruta: Ruta, onTomar: () -> Unit) {
                     Text(ruta.descripcion, color = TextSecondary, fontSize = 13.sp)
                 }
                 Text("Pedidos: ${ruta.totalPedidos}", color = TextSecondary, fontSize = 12.sp)
+                Text("Pago: $${ruta.totalPrice}", color = TextSecondary, fontSize = 12.sp)
             }
 
             Button(
@@ -239,7 +235,7 @@ fun PedidoCard(
 
             Column(Modifier.weight(1f).padding(start = 8.dp)) {
                 Text(pedido.nombre, color = TextPrimary, fontWeight = FontWeight.Bold)
-                Text("Pedido N°${pedido.id}", color = TextSecondary, fontSize = 13.sp)
+                Text("Orden N°${pedido.orderId}", color = TextSecondary, fontSize = 13.sp)
             }
 
             if (tipo == "recoger") {
@@ -264,8 +260,8 @@ fun DetallePedidoExpandido(
     pedido: Pedido,
     esRetorno: Boolean,
     onCerrar: () -> Unit,
-    onConfirmar: (File) -> Unit = {},
-    onDevolver: (String, File) -> Unit = { _, _ ->}
+    onConfirmar: (String, File, Double?, Double?) -> Unit = { _, _, _, _ -> },
+    onDevolver: (String, File, Double?, Double?) -> Unit = { _, _, _, _ -> }
 ) {
     val context = LocalContext.current
 
@@ -274,6 +270,37 @@ fun DetallePedidoExpandido(
 
     var mostrarMotivoDialog by remember { mutableStateOf(false) }
     var motivo by remember { mutableStateOf("") }
+
+    // Receiver dialog
+    var mostrarReceiverDialog by remember { mutableStateOf(false) }
+    var receiverName by remember { mutableStateOf("") }
+
+    // GPS
+    val fused = remember { LocationServices.getFusedLocationProviderClient(context) }
+    var pendingLocationAction by remember { mutableStateOf<((Double?, Double?) -> Unit)?>(null) }
+
+    val permisoUbicacion = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val action = pendingLocationAction
+        pendingLocationAction = null
+
+        if (!granted || action == null) {
+            action?.invoke(null, null)
+            return@rememberLauncherForActivityResult
+        }
+
+        fused.lastLocation.addOnSuccessListener { loc ->
+            action(loc?.latitude, loc?.longitude)
+        }.addOnFailureListener {
+            action(null, null)
+        }
+    }
+
+    fun withLocation(action: (Double?, Double?) -> Unit) {
+        pendingLocationAction = action
+        permisoUbicacion.launch(Manifest.permission.ACCESS_FINE_LOCATION)
+    }
 
     val permisoCamara = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -296,6 +323,36 @@ fun DetallePedidoExpandido(
         if (ok) fotoTomada = true
     }
 
+    if (mostrarReceiverDialog) {
+        AlertDialog(
+            onDismissRequest = { mostrarReceiverDialog = false },
+            title = { Text("¿Quién recibe el pedido?") },
+            text = {
+                OutlinedTextField(
+                    value = receiverName,
+                    onValueChange = { receiverName = it },
+                    label = { Text("Nombre de quien recibe") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val file = evidenciaFile
+                    val receiver = receiverName.trim()
+                    if (file != null && receiver.isNotBlank()) {
+                        withLocation { lat, lng ->
+                            onConfirmar(receiver, file, lat, lng)
+                        }
+                    }
+                    mostrarReceiverDialog = false
+                }) { Text("Confirmar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrarReceiverDialog = false }) { Text("Cancelar") }
+            }
+        )
+    }
+
     if (mostrarMotivoDialog) {
         AlertDialog(
             onDismissRequest = { mostrarMotivoDialog = false },
@@ -311,7 +368,12 @@ fun DetallePedidoExpandido(
             confirmButton = {
                 TextButton(onClick = {
                     val file = evidenciaFile
-                    if (file != null) onDevolver(motivo, file)
+                    val note = motivo.trim()
+                    if (file != null && note.isNotBlank()) {
+                        withLocation { lat, lng ->
+                            onDevolver(note, file, lat, lng)
+                        }
+                    }
                     mostrarMotivoDialog = false
                 }) { Text("Confirmar") }
             },
@@ -340,30 +402,14 @@ fun DetallePedidoExpandido(
                 }
             }
 
-            val imgId = context.resources.getIdentifier(pedido.imagen, "drawable", context.packageName)
-            if (imgId != 0) {
-                Image(
-                    painter = painterResource(imgId),
-                    contentDescription = pedido.nombre,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(230.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
             Text(pedido.nombre, color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-            Text("Pedido N°${pedido.id}", color = TextSecondary, fontSize = 13.sp)
+            Text("Orden N°${pedido.orderId}", color = TextSecondary, fontSize = 13.sp)
 
             Divider(Modifier.padding(vertical = 12.dp), color = Color(0xFF444444))
 
             if (pedido.direccion.isNotBlank())
                 Text("Dirección: ${pedido.direccion}", color = TextSecondary)
-
-            if (pedido.mensaje.isNotBlank())
-                Text("Mensaje: “${pedido.mensaje}”", color = TextSecondary)
 
             Divider(Modifier.padding(vertical = 12.dp), color = Color(0xFF444444))
 
@@ -391,10 +437,7 @@ fun DetallePedidoExpandido(
                     }
 
                     Button(
-                        onClick = {
-                            val file = evidenciaFile
-                            if (file != null) onConfirmar(file)
-                        },
+                        onClick = { mostrarReceiverDialog = true },
                         enabled = fotoTomada,
                         colors = ButtonDefaults.buttonColors(
                             if (fotoTomada) Color(0xFF4CAF50) else Color(0xFF424242)

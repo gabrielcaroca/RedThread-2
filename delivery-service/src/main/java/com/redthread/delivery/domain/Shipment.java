@@ -6,50 +6,82 @@ import lombok.*;
 import java.math.BigDecimal;
 import java.time.Instant;
 
-@Entity @Table(name = "shipments")
-@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+@Entity
+@Table(name = "shipments")
+@Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Shipment {
-    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false)
+    @Column(name="order_id", nullable=false)
     private Long orderId;
 
-    @Column(nullable=false)
+    // dueño del pedido (cliente)
+    @Column(name="user_id", nullable=false)
     private Long userId;
 
-    @Column(nullable=false, length=200)
+    @Column(name="address_line1", nullable=false, length=200)
     private String addressLine1;
-    @Column(length=200)
+
+    @Column(name="address_line2", length=200)
     private String addressLine2;
+
     @Column(nullable=false, length=120)
     private String city;
+
+    @Column(length=120)
     private String state;
+
+    @Column(length=40)
     private String zip;
+
     @Column(nullable=false, length=80)
     private String country;
 
-    @ManyToOne
-    @JoinColumn(name="zone_id")
-    private GeoZone zone;
-
     @Enumerated(EnumType.STRING)
     @Column(nullable=false, length=32)
-    private DeliveryStatus status;
+    private DeliveryStatus status = DeliveryStatus.PENDING_PICKUP;
 
-    @Column(nullable=false, precision=12, scale=2)
+    // despachador asignado (por ruta tomada o asignación directa)
+    @Column(name="assigned_user_id")
+    private Long assignedUserId;
+
+    // precio fijo por pedido
+    @Column(name="total_price", nullable=false, precision=12, scale=2)
     private BigDecimal totalPrice;
 
-    @Column(nullable=false)
+    // evidencia (entrega o fallo)
+    @Column(name="evidence_url", length=300)
+    private String evidenceUrl;
+
+    @Column(name="receiver_name", length=120)
+    private String receiverName;
+
+    @Column(length=500)
+    private String note;
+
+    @Column(name="created_at", nullable=false, updatable=false)
     private Instant createdAt;
-    @Column(nullable=false)
+
+    @Column(name="updated_at", nullable=false)
     private Instant updatedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "route_id")
+    private DeliveryRoute route;
 
     @PrePersist
     public void prePersist() {
         this.createdAt = Instant.now();
         this.updatedAt = this.createdAt;
+        if (this.status == null) this.status = DeliveryStatus.PENDING_PICKUP;
     }
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = Instant.now();

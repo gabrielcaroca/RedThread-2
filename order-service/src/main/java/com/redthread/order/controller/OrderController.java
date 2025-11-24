@@ -56,16 +56,8 @@ public class OrderController {
     );
   }
 
-  /**
-   * NUEVO: Endpoint interno para delivery-service.
-   * Retorna userId y shippingAddress con las llaves exactas que
-   * ShipmentServiceImpl espera hoy:
-   *  - userId
-   *  - shippingAddress { line1, line2, city, state, zip, country }
-   */
   @GetMapping("/{id}/delivery")
   public OrderDeliveryRes deliveryDetail(@PathVariable Long id) {
-    // se respeta ownership del cliente porque delivery llama con bearer del cliente al crear envío
     Order o = orderService.getByIdForUser(id, auth.currentUserId());
 
     var a = o.getAddress();
@@ -85,7 +77,7 @@ public class OrderController {
         o.getStatus().name(),
         o.getTotalAmount(),
         o.getUserId(),
-        addr, // OJO: se devuelve como "shippingAddress"
+        addr,
         o.getItems().stream().map(i ->
             new OrderItemRes(
                 i.getVariantId(),
@@ -97,10 +89,6 @@ public class OrderController {
     );
   }
 
-  /**
-   * NUEVO: Webhook interno que delivery-service intenta llamar.
-   * NO valida ownership porque quien llama es el repartidor/admin.
-   */
   @PostMapping("/{id}/delivery-status")
   public void deliveryStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
     String status = body.get("status");

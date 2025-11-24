@@ -2,42 +2,44 @@ package com.example.redthread.data.remote
 
 import com.example.redthread.data.local.SessionPrefs
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.runBlocking
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import kotlinx.coroutines.runBlocking
 
 object ApiClient {
 
-    //   SESSION (Token desde DataStore)
+    // Session (token desde DataStore)
     private lateinit var session: SessionPrefs
 
     fun init(sessionPrefs: SessionPrefs) {
         session = sessionPrefs
     }
 
-    //   INTERCEPTOR JWT
+    // Interceptor JWT: agrega Bearer automáticamente si hay token
     private val authInterceptor = Interceptor { chain ->
-
         val token = runBlocking {
-            session.tokenFlow.firstOrNull() ?: ""
+            if (::session.isInitialized) session.tokenFlow.firstOrNull() ?: "" else ""
         }
 
-        val newReq = if (token.isNotBlank()) {
+        val req = if (token.isNotBlank()) {
             chain.request().newBuilder()
                 .addHeader("Authorization", "Bearer $token")
                 .build()
-        } else chain.request()
+        } else {
+            chain.request()
+        }
 
-        chain.proceed(newReq)
+        chain.proceed(req)
     }
 
-    private val client = OkHttpClient.Builder()
-        .addInterceptor(authInterceptor)
-        .build()
+    private val client: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(authInterceptor)
+            .build()
+    }
 
-    //   RETROFIT GENERADOR
     private fun retrofit(baseUrl: String): Retrofit =
         Retrofit.Builder()
             .baseUrl(baseUrl)
@@ -45,8 +47,7 @@ object ApiClient {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
-    //   MICROSERVICIOS
-
+    // Microservicios
     val identity: AuthApi by lazy {
         retrofit(BaseUrls.IDENTITY).create(AuthApi::class.java)
     }
@@ -63,8 +64,8 @@ object ApiClient {
         retrofit(BaseUrls.DELIVERY).create(DeliveryApi::class.java)
     }
 
-    //  NUEVO: AddressApi (usa el microservicio identity-service puerto 8081)
+    // AddressApi vive en order-service (8083)
     val address: AddressApi by lazy {
-        retrofit(BaseUrls.IDENTITY).create(AddressApi::class.java)
+        retrofit(BaseUrls.ORDERS).create(AddressApi::class.java)
     }
 }

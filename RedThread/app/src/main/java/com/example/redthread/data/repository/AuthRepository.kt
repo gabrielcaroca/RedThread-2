@@ -1,13 +1,12 @@
 package com.example.redthread.data.repository
 
 import android.content.Context
-import com.example.redthread.data.AuthStorage
 import com.example.redthread.data.local.SessionPrefs
 import com.example.redthread.data.remote.ApiClient
-import com.example.redthread.data.remote.Dto.AuthResponse
-import com.example.redthread.data.remote.Dto.LoginRequest
-import com.example.redthread.data.remote.Dto.RegisterRequest
-import com.example.redthread.data.remote.Dto.UserProfileDto
+import com.example.redthread.data.remote.dto.AuthResponse
+import com.example.redthread.data.remote.dto.LoginRequest
+import com.example.redthread.data.remote.dto.RegisterRequest
+import com.example.redthread.data.remote.dto.UserProfileDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext

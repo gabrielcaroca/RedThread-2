@@ -4,6 +4,5 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 
 public record AssignRequest(
-        @NotNull @Positive Long driverId,
-        Long vehicleId
+        @NotNull @Positive Long assignedUserId
 ) { }

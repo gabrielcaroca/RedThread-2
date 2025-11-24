@@ -29,8 +29,41 @@ public class OrderService {
   public Order getByIdForUser(Long id, String userId) {
     var order = orderRepo.findByIdAndUserId(id, userId)
         .orElseThrow(() -> new IllegalArgumentException("Order no encontrada"));
-    order.setItems(itemRepo.findByOrderId(order.getId())); 
+    order.setItems(itemRepo.findByOrderId(order.getId()));
     return order;
+  }
+
+  /**
+   * Webhook interno llamado por delivery-service.
+   * Enum OrderStatus: {CREATED, PAID, CANCELLED, SHIPPED}
+   * Mapeo:
+   * - DELIVERED -> SHIPPED
+   * - FAILED    -> CANCELLED
+   * - otros     -> no cambia nada
+   */
+  @Transactional
+  public void updateDeliveryStatusInternal(Long orderId, String deliveryStatus, String note) {
+    Order order = orderRepo.findById(orderId)
+        .orElseThrow(() -> new IllegalArgumentException("Order no encontrada"));
+
+    if (deliveryStatus == null) return;
+
+    String s = deliveryStatus.trim().toUpperCase();
+
+    switch (s) {
+      case "DELIVERED" -> order.setStatus(OrderStatus.SHIPPED);
+      case "FAILED" -> order.setStatus(OrderStatus.CANCELLED);
+      default -> {
+        // ASSIGNED / IN_TRANSIT / PENDING_PICKUP / etc.
+        // no afectan el estado de la orden
+        return;
+      }
+    }
+
+    // note por ahora no se guarda porque Order no tiene campo para eso.
+    // Si mas adelante agregas historial/notas, se guarda aqui.
+
+    orderRepo.save(order);
   }
 
   @Transactional
@@ -39,9 +72,10 @@ public class OrderService {
     if (order.getStatus() != OrderStatus.CREATED)
       throw new IllegalStateException("Solo CREATED puede pagarse");
 
+    // registrar intento/pago (provider puede ser null)
     payRepo.save(PaymentAttempt.builder()
         .order(order)
-        .provider(provider)
+        .provider(provider == null ? "DEFAULT" : provider)
         .status(PaymentStatus.APPROVED)
         .createdAt(java.time.Instant.now())
         .build());
@@ -61,6 +95,7 @@ public class OrderService {
     for (var it : items) {
       catalog.adjustStock(it.getVariantId(), +it.getQuantity());
     }
+
     order.setStatus(OrderStatus.CANCELLED);
     return orderRepo.save(order);
   }

@@ -1,8 +1,8 @@
 package com.example.redthread.data.remote
 
-import com.example.redthread.data.remote.Dto.AddressDto
-import com.example.redthread.data.remote.Dto.CreateAddressRequest
-import com.example.redthread.data.remote.Dto.UpdateAddressRequest
+import com.example.redthread.data.remote.dto.AddressDto
+import com.example.redthread.data.remote.dto.CreateAddressRequest
+import com.example.redthread.data.remote.dto.UpdateAddressRequest
 import retrofit2.http.*
 
 interface AddressApi {
