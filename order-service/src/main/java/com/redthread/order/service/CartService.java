@@ -20,6 +20,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class CartService {
+
   private final CartRepository cartRepo;
   private final CartItemRepository itemRepo;
   private final CatalogClient catalog;
@@ -67,7 +68,7 @@ public class CartService {
     CartItem item = itemRepo.findByCartIdAndVariantId(cartId, fVariantId)
         .map(existing -> {
           existing.setQuantity(existing.getQuantity() + fQty);
-          if (fUnit != null && fUnit.compareTo(BigDecimal.ZERO) > 0) {
+          if (fUnit.compareTo(BigDecimal.ZERO) > 0) {
             existing.setUnitPrice(fUnit);
           }
           return existing;
@@ -76,7 +77,7 @@ public class CartService {
             .cart(c)
             .variantId(fVariantId)
             .quantity(fQty)
-            .unitPrice((fUnit != null) ? fUnit : BigDecimal.ZERO)
+            .unitPrice(fUnit)
             .build());
 
     itemRepo.save(item);
@@ -89,6 +90,7 @@ public class CartService {
     Cart c = requireCart(userId);
     CartItem it = itemRepo.findByIdAndCartId(itemId, c.getId())
         .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
+
     it.setQuantity(req.quantity());
     itemRepo.save(it);
     c.setUpdatedAt(Instant.now());
@@ -101,6 +103,22 @@ public class CartService {
     CartItem it = itemRepo.findByIdAndCartId(itemId, c.getId())
         .orElseThrow(() -> new IllegalArgumentException("Item no encontrado"));
     itemRepo.delete(it);
+    c.setUpdatedAt(Instant.now());
+  }
+
+  //eliminar por variantId
+  @Transactional
+  public void removeItemByVariant(String userId, Long variantId) {
+    Cart c = requireCart(userId);
+    itemRepo.deleteByCartIdAndVariantId(c.getId(), variantId);
+    c.setUpdatedAt(Instant.now());
+  }
+
+  //vaciar carrito
+  @Transactional
+  public void clearCart(String userId) {
+    Cart c = requireCart(userId);
+    itemRepo.deleteByCartId(c.getId());
     c.setUpdatedAt(Instant.now());
   }
 }

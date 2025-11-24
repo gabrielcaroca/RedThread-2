@@ -36,9 +36,14 @@ fun AppNavGraph(
     val cartVm: CartViewModel = viewModel()
     val cartCount by cartVm.count.collectAsState()
 
-    LaunchedEffect(header.email) {
-        cartVm.bindToUserEmail(header.email)
+    LaunchedEffect(header.isLoggedIn, header.email) {
+        if (header.isLoggedIn) {
+            cartVm.refreshFromBackendIfLogged()
+        } else {
+            cartVm.clear() // limpia UI local si no hay sesión
+        }
     }
+
 
     Scaffold(
         topBar = {

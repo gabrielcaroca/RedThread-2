@@ -22,7 +22,7 @@ import com.example.redthread.ui.viewmodel.CartViewModel
 import com.example.redthread.ui.viewmodel.PedidoViewModel
 import com.example.redthread.ui.viewmodel.ProfileViewModel
 import com.example.redthread.ui.viewmodel.ProfileVmFactory
-import kotlinx.coroutines.delay
+import com.example.redthread.data.remote.ApiClient
 import kotlinx.coroutines.launch
 
 @Composable
@@ -185,30 +185,27 @@ fun CheckoutScreen(
                 if (isPaying) return@Button
                 isPaying = true
 
-                val totalSnapshot = total
-
-                // ✅ tu VM espera String
-                val productosSnapshot = items.joinToString("\n") {
-                    "${it.nombre} x${it.cantidad}"
-                }
-
                 scope.launch {
-                    delay(1200) // simula pago
+                    try {
+                        val order = ApiClient.orders.checkout(
+                            com.example.redthread.data.remote.CheckoutReq(
+                                addressId = direccionSeleccionadaId!!.toLong()
+                            )
+                        )
 
-                    val dir = direcciones.first { it.id == direccionSeleccionadaId }
+                        // backend ya vació el carrito
+                        cartVm.refreshFromBackendIfLogged()
 
-                    val pedidoId = pedidoVm.createPedidoReturnId(
-                        usuario = "Usuario",
-                        direccion = dir.line1,
-                        total = totalSnapshot.toLong(),
-                        productosSnapshot = productosSnapshot
-                    )
+                        isPaying = false
+                        onPaidSuccess(order.id, order.totalAmount.toInt(), metodo)
 
-                    cartVm.clear()
-                    isPaying = false
-                    onPaidSuccess(pedidoId, totalSnapshot, metodo)
+                    } catch (e: Exception) {
+                        isPaying = false
+                        errorMsg = "Error al hacer checkout: ${e.message}"
+                    }
                 }
             },
+
             enabled = !isPaying,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = Black)

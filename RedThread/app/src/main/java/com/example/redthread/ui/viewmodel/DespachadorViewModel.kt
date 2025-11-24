@@ -44,6 +44,48 @@ class DespachadorViewModel : ViewModel() {
     val porEntregar = mutableStateListOf<Pedido>()
     val retornos = mutableStateListOf<Pedido>()
 
+    // ====== MODO DEMO (TEMPORAL PARA PRUEBAS RAPIDAS) ======
+    private val demoMode = true  // ponlo en false cuando quieras volver 100% a backend
+
+    private fun demoRuta(): Ruta {
+        return Ruta(
+            id = 999L,
+            nombre = "Ruta DEMO",
+            descripcion = "Pruebas sin backend",
+            totalPedidos = 3,
+            totalPrice = 6000L
+        )
+    }
+
+    private fun demoPedidos(): List<Pedido> {
+        return listOf(
+            Pedido(
+                id = 1,
+                orderId = 101L,
+                nombre = "Pedido #101",
+                imagen = "ic_box",
+                estado = "PENDING_PICKUP",
+                direccion = "Av. Siempre Viva 742, Springfield"
+            ),
+            Pedido(
+                id = 2,
+                orderId = 102L,
+                nombre = "Pedido #102",
+                imagen = "ic_box",
+                estado = "PENDING_PICKUP",
+                direccion = "Los Alerces 123, Santiago"
+            ),
+            Pedido(
+                id = 3,
+                orderId = 103L,
+                nombre = "Pedido #103",
+                imagen = "ic_box",
+                estado = "IN_TRANSIT",
+                direccion = "Grecia 5500, Ñuñoa"
+            )
+        )
+    }
+
     init {
         cargarRutasActivas()
     }
@@ -62,10 +104,22 @@ class DespachadorViewModel : ViewModel() {
                         totalPrice = it.totalPrice
                     )
                 }
+
                 rutasActivas.clear()
                 rutasActivas.addAll(data)
+
+                // ====== fallback demo si backend no devuelve nada ======
+                if (demoMode && rutasActivas.isEmpty()) {
+                    rutasActivas.add(demoRuta())
+                }
+
             } catch (e: Exception) {
-                error.value = e.message ?: "Error cargando rutas activas."
+                if (demoMode) {
+                    rutasActivas.clear()
+                    rutasActivas.add(demoRuta())
+                } else {
+                    error.value = e.message ?: "Error cargando rutas activas."
+                }
             } finally {
                 cargando.value = false
             }
@@ -77,17 +131,56 @@ class DespachadorViewModel : ViewModel() {
             cargando.value = true
             error.value = null
             try {
-                val r = repo.tomarRuta(routeId)
-                rutaSeleccionada.value = Ruta(
-                    id = r.id,
-                    nombre = r.nombre,
-                    descripcion = r.descripcion,
-                    totalPedidos = r.totalPedidos,
-                    totalPrice = r.totalPrice
-                )
-                cargarPedidosRuta()
+                // ====== tomar ruta demo ======
+                if (demoMode && routeId == 999L) {
+                    rutaSeleccionada.value = demoRuta()
+
+                    val allPedidos = demoPedidos()
+
+                    pendientes.clear()
+                    porEntregar.clear()
+                    retornos.clear()
+
+                    allPedidos.forEach { p ->
+                        when (p.estado) {
+                            "PENDING_PICKUP", "ASSIGNED" -> pendientes.add(p)
+                            "IN_TRANSIT" -> porEntregar.add(p)
+                            "FAILED" -> retornos.add(p)
+                        }
+                    }
+
+                } else {
+                    val r = repo.tomarRuta(routeId)
+                    rutaSeleccionada.value = Ruta(
+                        id = r.id,
+                        nombre = r.nombre,
+                        descripcion = r.descripcion,
+                        totalPedidos = r.totalPedidos,
+                        totalPrice = r.totalPrice
+                    )
+                    cargarPedidosRuta()
+                }
+
             } catch (e: Exception) {
-                error.value = e.message ?: "No se pudo tomar ruta."
+                if (demoMode) {
+                    rutaSeleccionada.value = demoRuta()
+
+                    val allPedidos = demoPedidos()
+
+                    pendientes.clear()
+                    porEntregar.clear()
+                    retornos.clear()
+
+                    allPedidos.forEach { p ->
+                        when (p.estado) {
+                            "PENDING_PICKUP", "ASSIGNED" -> pendientes.add(p)
+                            "IN_TRANSIT" -> porEntregar.add(p)
+                            "FAILED" -> retornos.add(p)
+                        }
+                    }
+                } else {
+                    error.value = e.message ?: "No se pudo tomar ruta."
+                }
             } finally {
                 cargando.value = false
             }
@@ -100,6 +193,10 @@ class DespachadorViewModel : ViewModel() {
 
     fun cargarPedidosRuta() {
         val ruta = rutaSeleccionada.value ?: return
+
+        // si es ruta demo, no pegamos al backend
+        if (demoMode && ruta.id == 999L) return
+
         viewModelScope.launch {
             cargando.value = true
             error.value = null
@@ -111,7 +208,7 @@ class DespachadorViewModel : ViewModel() {
                         id = s.id.toInt(),
                         orderId = s.orderId,
                         nombre = "Pedido #${s.orderId}",
-                        imagen = "ic_box", // drawable placeholder
+                        imagen = "ic_box",
                         estado = s.status ?: "PENDING_PICKUP",
                         direccion = listOfNotNull(
                             s.addressLine1, s.addressLine2, s.city, s.state, s.zip, s.country
@@ -140,6 +237,15 @@ class DespachadorViewModel : ViewModel() {
     }
 
     fun recogerPedido(shipmentId: Int) {
+        // si es demo, simular movimiento local
+        val ruta = rutaSeleccionada.value
+        if (demoMode && ruta?.id == 999L) {
+            val p = pendientes.firstOrNull { it.id == shipmentId } ?: return
+            pendientes.remove(p)
+            porEntregar.add(p.copy(estado = "IN_TRANSIT"))
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repo.startShipment(shipmentId.toLong())
@@ -150,7 +256,21 @@ class DespachadorViewModel : ViewModel() {
         }
     }
 
-    fun confirmarEntrega(shipmentId: Int, receiverName: String, evidencia: File, lat: Double?, lng: Double?) {
+    fun confirmarEntrega(
+        shipmentId: Int,
+        receiverName: String,
+        evidencia: File,
+        lat: Double?,
+        lng: Double?
+    ) {
+        // si es demo, simular cierre local
+        val ruta = rutaSeleccionada.value
+        if (demoMode && ruta?.id == 999L) {
+            val p = porEntregar.firstOrNull { it.id == shipmentId } ?: return
+            porEntregar.remove(p)
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repo.delivered(shipmentId.toLong(), receiverName, evidencia, lat, lng)
@@ -161,7 +281,22 @@ class DespachadorViewModel : ViewModel() {
         }
     }
 
-    fun marcarDevuelto(shipmentId: Int, motivo: String, evidencia: File, lat: Double?, lng: Double?) {
+    fun marcarDevuelto(
+        shipmentId: Int,
+        motivo: String,
+        evidencia: File,
+        lat: Double?,
+        lng: Double?
+    ) {
+        // si es demo, simular retorno local
+        val ruta = rutaSeleccionada.value
+        if (demoMode && ruta?.id == 999L) {
+            val p = porEntregar.firstOrNull { it.id == shipmentId } ?: return
+            porEntregar.remove(p)
+            retornos.add(p.copy(estado = "FAILED", motivoDevolucion = motivo))
+            return
+        }
+
         viewModelScope.launch {
             try {
                 repo.fail(shipmentId.toLong(), motivo, evidencia, lat, lng)

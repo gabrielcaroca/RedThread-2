@@ -8,12 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +20,8 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.redthread.data.remote.ApiClient
+import com.example.redthread.data.remote.dto.VariantDto
 import com.example.redthread.ui.theme.Black
 import com.example.redthread.ui.theme.CardGray
 import com.example.redthread.ui.theme.TextPrimary
@@ -38,10 +35,13 @@ fun DetalleProductoScreen(
     nombre: String,
     precio: String,
     categoria: String,
-    onAddedToCart: () -> Unit = {},   // ahora se usará para volver a Home
+    onAddedToCart: () -> Unit = {},
     cartVm: CartViewModel
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+
+    // imagen placeholder por categoria (igual que antes)
     val drawableName = when (categoria.lowercase()) {
         "polera" -> "ph_polera"
         "chaqueta" -> "ph_chaqueta"
@@ -54,14 +54,32 @@ fun DetalleProductoScreen(
         ctx.resources.getIdentifier(drawableName, "drawable", ctx.packageName)
     }
 
-    val tallas = listOf("XS", "S", "M", "L", "XL")
-    val colores = listOf("Negro", "Blanco", "Rojo", "Azul", "Gris")
+    // ====== VARIANTES REALES DESDE BACKEND ======
+    var variants by remember { mutableStateOf<List<VariantDto>>(emptyList()) }
+    var loading by remember { mutableStateOf(true) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(id) {
+        loading = true
+        loadError = null
+        try {
+            variants = ApiClient.catalog.listVariantsByProduct(id)
+        } catch (e: Exception) {
+            loadError = e.message ?: "Error cargando variantes"
+            variants = emptyList()
+        } finally {
+            loading = false
+        }
+    }
+
+    // tallas/colores que existen realmente
+    val tallas = variants.map { it.sizeValue }.distinct()
+    val colores = variants.map { it.color }.distinct()
 
     var talla by remember { mutableStateOf<String?>(null) }
     var color by remember { mutableStateOf<String?>(null) }
 
-    val scope = rememberCoroutineScope()
-    val canAdd = talla != null && color != null
+    val canAdd = talla != null && color != null && variants.isNotEmpty() && !loading && loadError == null
 
     Column(
         modifier = Modifier
@@ -69,6 +87,7 @@ fun DetalleProductoScreen(
             .background(Black)
             .padding(16.dp)
     ) {
+
         // Imagen
         Box(
             modifier = Modifier
@@ -94,22 +113,43 @@ fun DetalleProductoScreen(
         Spacer(Modifier.height(6.dp))
         Text(text = precio, color = TextSecondary, fontSize = 16.sp)
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(18.dp))
 
-        // Dropdowns
+        if (loading) {
+            Text("Cargando variantes...", color = TextSecondary)
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (loadError != null) {
+            Text("Error: $loadError", color = Color.Red)
+            Spacer(Modifier.height(8.dp))
+        }
+
+        if (!loading && variants.isEmpty() && loadError == null) {
+            Text(
+                "Este producto no tiene variantes creadas en el catálogo.",
+                color = TextSecondary
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+
+        // Dropdown Talla (solo si hay data)
         SimpleDropdownField(
             label = "Talla",
             options = tallas,
             selected = talla,
+            enabled = tallas.isNotEmpty(),
             onSelected = { talla = it }
         )
 
         Spacer(Modifier.height(12.dp))
 
+        // Dropdown Color
         SimpleDropdownField(
             label = "Color",
             options = colores,
             selected = color,
+            enabled = colores.isNotEmpty(),
             onSelected = { color = it }
         )
 
@@ -117,6 +157,16 @@ fun DetalleProductoScreen(
 
         Button(
             onClick = {
+                val selectedVariant = variants.firstOrNull {
+                    it.sizeValue.equals(talla, true) &&
+                            it.color.equals(color, true)
+                }
+
+                if (selectedVariant == null) {
+                    Toast.makeText(ctx, "No existe esa combinación en el catálogo", Toast.LENGTH_SHORT).show()
+                    return@Button
+                }
+
                 cartVm.addToCart(
                     CartViewModel.CartItem(
                         productId = id,
@@ -124,12 +174,12 @@ fun DetalleProductoScreen(
                         talla = talla!!,
                         color = color!!,
                         precio = precio,
-                        cantidad = 1
+                        cantidad = 1,
+                        variantId = selectedVariant.id
                     )
                 )
-                // ✅ Toast de confirmación
+
                 Toast.makeText(ctx, "Producto agregado al carrito", Toast.LENGTH_SHORT).show()
-                // ✅ Vuelve a inicio (se hace desde NavGraph via onAddedToCart)
                 scope.launch { onAddedToCart() }
             },
             enabled = canAdd,
@@ -151,12 +201,12 @@ fun DetalleProductoScreen(
     }
 }
 
-/** Dropdown estable: el click va en el contenedor; el TextField se pinta pero NO intercepta eventos. */
 @Composable
 private fun SimpleDropdownField(
     label: String,
     options: List<String>,
     selected: String?,
+    enabled: Boolean,
     onSelected: (String) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -164,20 +214,17 @@ private fun SimpleDropdownField(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { expanded = true }
+            .clickable(enabled = enabled) { expanded = true }
     ) {
         OutlinedTextField(
-            value = selected ?: "Selecciona $label",
+            value = selected ?: if (enabled) "Selecciona $label" else "No disponible",
             onValueChange = {},
             readOnly = true,
             enabled = false,
-            isError = selected == null,
+            isError = enabled && selected == null,
             label = { Text(label) },
             trailingIcon = {
-                androidx.compose.material3.Icon(
-                    Icons.Filled.ArrowDropDown,
-                    contentDescription = null
-                )
+                Icon(Icons.Filled.ArrowDropDown, contentDescription = null)
             },
             modifier = Modifier.fillMaxWidth()
         )

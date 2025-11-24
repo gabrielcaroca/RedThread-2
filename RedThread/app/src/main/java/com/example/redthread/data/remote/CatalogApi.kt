@@ -68,4 +68,8 @@ interface CatalogApi {
         @Path("productId") productId: Int,
         @Path("imageId") imageId: Int
     )
+
+    @GET("variants/{id}")
+    suspend fun getVariant(@Path("id") id: Long): VariantDto
+
 }

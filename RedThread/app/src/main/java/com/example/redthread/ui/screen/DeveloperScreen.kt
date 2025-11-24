@@ -154,7 +154,7 @@ fun OrdersTab(
             onClick = {
                 if (seleccionados.isNotEmpty()) {
                     val nombreRuta = "Ruta${System.currentTimeMillis() % 1000}"
-                    vmRuta.crearRuta(nombreRuta, seleccionados)         // <-- LOCAL
+                    vmRuta.crearRuta(nombreRuta, seleccionados)
                     seleccionados.forEach { vmPedido.actualizarEstadoPedido(it, "asignado") }
                     seleccionados.clear()
                 }
