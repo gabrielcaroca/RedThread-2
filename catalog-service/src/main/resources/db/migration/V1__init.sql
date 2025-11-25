@@ -31,10 +31,8 @@ CREATE TABLE products (
     base_price NUMERIC(12,2) NOT NULL CHECK (base_price >= 0),
     active BOOLEAN NOT NULL DEFAULT TRUE,
 
-    -- ✅ NUEVO: destacado para home
     featured BOOLEAN NOT NULL DEFAULT FALSE,
 
-    -- ✅ NUEVO: género para tabs
     gender VARCHAR(10) NOT NULL DEFAULT 'HOMBRE',
     CONSTRAINT products_gender_chk CHECK (gender IN ('HOMBRE', 'MUJER')),
 

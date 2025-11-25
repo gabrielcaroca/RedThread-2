@@ -1,5 +1,8 @@
 package com.redthread.delivery.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -13,13 +16,19 @@ import java.nio.file.*;
 
 @RestController
 @RequestMapping("/evidence")
+@Tag(name="Evidence", description="Acceso a imágenes de evidencia (entregado/fallido)")
 public class EvidenceController {
 
     @Value("${app.evidence.dir:./evidence}")
     private String evidenceDir;
 
     @GetMapping("/{filename:.+}")
-    public ResponseEntity<InputStreamResource> getEvidence(@PathVariable String filename) throws IOException {
+    @Operation(summary="Descargar evidencia", description="Sirve una imagen guardada en disco.")
+    public ResponseEntity<InputStreamResource> getEvidence(
+            @Parameter(description="Nombre exacto del archivo", example="delivered_10_1732579200000.jpg")
+            @PathVariable String filename
+    ) throws IOException {
+
         if (!StringUtils.hasText(filename) || filename.contains("..")) {
             return ResponseEntity.badRequest().build();
         }
