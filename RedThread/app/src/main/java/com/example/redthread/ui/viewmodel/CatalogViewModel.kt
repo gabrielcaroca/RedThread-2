@@ -39,11 +39,14 @@ class CatalogViewModel(
     private val _product = MutableStateFlow<ProductDto?>(null)
     val product: StateFlow<ProductDto?> = _product
 
-    // 🔥 NUEVO → lista completa de productos del backend
+    // ⭐ Lista completa de productos
     private val _products = MutableStateFlow<List<ProductDto>>(emptyList())
     val products: StateFlow<List<ProductDto>> = _products
 
-    // 🔥 NUEVO → carga lista de productos
+
+    // ============================
+    // LISTAR PRODUCTOS
+    // ============================
     fun loadProducts() = viewModelScope.launch {
         safeCall(
             action = { repo.getProducts() },
@@ -52,7 +55,7 @@ class CatalogViewModel(
     }
 
     // ============================
-    // CARGAR DATOS
+    // CATEGORÍAS / MARCAS / PRODUCTO
     // ============================
     fun loadCategories() = viewModelScope.launch {
         safeCall(
@@ -101,7 +104,7 @@ class CatalogViewModel(
         }
 
     // ============================
-    // SUBIR IMAGEN (archivo)
+    // SUBIR IMAGEN (MULTIPART)
     // ============================
     fun uploadImage(productId: Int, file: MultipartBody.Part, onDone: () -> Unit) =
         viewModelScope.launch {
@@ -137,7 +140,6 @@ class CatalogViewModel(
                 input.close()
 
                 val requestBody = bytes.toRequestBody("image/*".toMediaTypeOrNull())
-
                 val part = MultipartBody.Part.createFormData(
                     name = "file",
                     filename = "image_${System.currentTimeMillis()}.jpg",
@@ -155,8 +157,9 @@ class CatalogViewModel(
         }
     }
 
+
     // ============================
-    // HANDLER GENÉRICO DE ERRORES
+    // MANEJADOR GENÉRICO DE ERRORES
     // ============================
     private suspend fun <T> safeCall(
         action: suspend () -> T,

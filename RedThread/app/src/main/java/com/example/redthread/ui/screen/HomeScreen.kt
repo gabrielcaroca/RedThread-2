@@ -15,9 +15,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,70 +32,105 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
+
+import coil.compose.AsyncImage
+import coil.compose.rememberAsyncImagePainter
 import com.example.redthread.ui.theme.*
-import com.example.redthread.ui.viewmodel.ProductoViewModel
+// 👇 ESTOS SON LOS IMPORTS QUE FALTABAN PARA QUE NO DE ERROR
+import com.example.redthread.ui.viewmodel.CatalogViewModel
+import com.example.redthread.data.remote.dto.ProductDto
 import kotlinx.coroutines.delay
 
 // ------------------------
-// filtros de vista
+// Filtros de vista
 // ------------------------
 enum class Filtro { TODOS, HOMBRES, MUJERES }
 
+// Modelo visual para la pantalla (Mantenemos tu estructura)
 data class ProductoUi(
     val id: Int,
     val nombre: String,
     val precio: String,
     val categoria: String,
-    val target: Filtro = Filtro.TODOS
+    val dtoOriginal: ProductDto? = null // Referencia al objeto real del backend
 )
 
 // ------------------------
-// pantalla principal
+// PANTALLA PRINCIPAL
 // ------------------------
 @Composable
 fun HomeScreen(
+    catalogVm: CatalogViewModel, // 👈 Ahora recibimos el ViewModel del Backend
     onProductoClick: (ProductoUi) -> Unit = {},
     onCarritoClick: () -> Unit = {},
-    onPerfilClick: () -> Unit = {},
-    vmProducto: ProductoViewModel = viewModel()
+    onPerfilClick: () -> Unit = {}
 ) {
     var filtro by remember { mutableStateOf(Filtro.TODOS) }
 
-    val productos by vmProducto.productos.collectAsState()
-    val destacados by vmProducto.destacados.collectAsState()
-
-    // ⬇️ Estado del filtro por subcategoría (null = Todas)
-    var subcatSel by remember { mutableStateOf<String?>(null) }
-
-    var isLoading by remember { mutableStateOf(true) }
+    // 1. Cargar productos del servidor al entrar
     LaunchedEffect(Unit) {
-        delay(1000)
-        isLoading = false
+        catalogVm.loadProducts()
     }
 
-    // Base de datos visible según tab actual (para calcular subcategorías disponibles)
-    val baseActual = remember(productos, destacados, filtro) {
-        when (filtro) {
-            Filtro.TODOS -> destacados
-            Filtro.HOMBRES -> productos.filter { it.categoria.equals("Hombre", ignoreCase = true) }
-            Filtro.MUJERES -> productos.filter { it.categoria.equals("Mujer", ignoreCase = true) }
+    // 2. Observar la lista que viene del Microservicio
+    val productosBackend by catalogVm.products.collectAsState()
+    val loading by catalogVm.loading.collectAsState()
+
+    // Estado del filtro por subcategoría (Dropdown)
+    var subcatSel by remember { mutableStateOf<String?>(null) }
+
+    // Carga visual inicial
+    var isVisualLoading by remember { mutableStateOf(true) }
+    LaunchedEffect(Unit) {
+        delay(800)
+        isVisualLoading = false
+    }
+
+    // ===========================================================
+    // 3. TRANSFORMACIÓN: Backend (Dto) -> Pantalla (Ui)
+    // ===========================================================
+    val productosMapeados = remember(productosBackend) {
+        productosBackend.map { dto ->
+            ProductoUi(
+                id = dto.id,
+                nombre = dto.name,
+                // Formateamos el precio: 1500.0 -> $1.500
+                precio = "$${"%,.0f".format(dto.basePrice)}",
+                // Si no tiene categoría, ponemos "General"
+                categoria = dto.category?.name ?: "General",
+                dtoOriginal = dto
+            )
         }
     }
 
-    // Subcategorías disponibles deducidas de la base visible
-    val subcategoriasDisponibles by remember(baseActual) {
+    // 4. Filtrado por Tabs (Hombre / Mujer / Todos)
+    val baseActual = remember(productosMapeados, filtro) {
+        when (filtro) {
+            Filtro.TODOS -> productosMapeados
+            Filtro.HOMBRES -> productosMapeados.filter {
+                it.nombre.contains("Hombre", true) || it.categoria.contains("Hombre", true)
+            }
+            Filtro.MUJERES -> productosMapeados.filter {
+                it.nombre.contains("Mujer", true) || it.categoria.contains("Mujer", true)
+            }
+        }
+    }
+
+    // Categorías disponibles para el Dropdown
+    val categoriasDisponibles by remember(baseActual) {
         mutableStateOf(
-            baseActual.map { it.subcategoria }
+            baseActual.map { it.categoria }
                 .filter { it.isNotBlank() }
                 .distinct()
                 .sorted()
         )
     }
 
-    // Si cambias de tab y la subcategoría ya no existe en el nuevo set, resetea a "Todas"
-    LaunchedEffect(subcategoriasDisponibles) {
-        if (subcatSel != null && subcatSel !in subcategoriasDisponibles) {
+    // Resetear dropdown si cambia la pestaña
+    LaunchedEffect(categoriasDisponibles) {
+        if (subcatSel != null && subcatSel !in categoriasDisponibles) {
             subcatSel = null
         }
     }
@@ -107,6 +140,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(Black)
     ) {
+        // Tabs Superiores
         TabsAnimated(
             selected = filtro,
             onSelect = { filtro = it }
@@ -114,59 +148,46 @@ fun HomeScreen(
 
         Spacer(Modifier.height(8.dp))
 
-        // ⬇️ Dropdown de subcategorías (se muestra solo si hay opciones)
-        if (subcategoriasDisponibles.isNotEmpty()) {
+        // Dropdown de Categorías
+        if (categoriasDisponibles.isNotEmpty()) {
             SubcategoriaFilterDropdown(
-                opciones = subcategoriasDisponibles,
+                opciones = categoriasDisponibles,
                 seleccion = subcatSel,
-                onChange = { nueva ->
-                    subcatSel = nueva // null = Todas
-                }
+                onChange = { nueva -> subcatSel = nueva }
             )
             Spacer(Modifier.height(8.dp))
         }
 
-        Crossfade(targetState = isLoading, label = "homeCrossfadeLoading") { loading ->
-            if (loading) {
+        // Contenido Principal
+        Crossfade(targetState = (isVisualLoading || (loading && productosBackend.isEmpty())), label = "homeLoader") { isLoading ->
+            if (isLoading) {
                 SkeletonGrid()
             } else {
-                // 1) Tomamos la base de entidades según el tab seleccionado
-                val entidadesBase = baseActual
-
-                // 2) Aplicamos el filtro de subcategoría si corresponde
-                val entidadesFiltradas = if (subcatSel == null) {
-                    entidadesBase
+                // Filtrado final por Dropdown
+                val listaFinal = if (subcatSel == null) {
+                    baseActual
                 } else {
-                    entidadesBase.filter { it.subcategoria.equals(subcatSel, ignoreCase = true) }
+                    baseActual.filter { it.categoria.equals(subcatSel, ignoreCase = true) }
                 }
 
-                // 3) Mapeamos a ProductoUi
-                val lista = entidadesFiltradas.map {
-                    ProductoUi(
-                        id = it.id,
-                        nombre = it.nombre,
-                        precio = "$${"%,d".format(it.precio)}",
-                        categoria = it.subcategoria,
-                        target = when (filtro) {
-                            Filtro.TODOS -> Filtro.TODOS
-                            Filtro.HOMBRES -> Filtro.HOMBRES
-                            Filtro.MUJERES -> Filtro.MUJERES
-                        }
+                if (listaFinal.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("No hay productos disponibles", color = TextSecondary)
+                    }
+                } else {
+                    AnimatedProductGrid(
+                        filtro = filtro,
+                        productos = listaFinal,
+                        onProductoClick = onProductoClick
                     )
                 }
-
-                AnimatedProductGrid(
-                    filtro = filtro,
-                    productos = lista,
-                    onProductoClick = onProductoClick
-                )
             }
         }
     }
 }
 
 // ------------------------
-// Dropdown de Subcategoría
+// Dropdown
 // ------------------------
 @Composable
 private fun SubcategoriaFilterDropdown(
@@ -176,7 +197,6 @@ private fun SubcategoriaFilterDropdown(
 ) {
     var expanded by remember { mutableStateOf(false) }
 
-    // Caja "pill" clickeable + menú desplegable
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,13 +211,13 @@ private fun SubcategoriaFilterDropdown(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Subcategoría: ${seleccion ?: "Todas"}",
+                text = "Categoría: ${seleccion ?: "Todas"}",
                 color = TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
             )
             Spacer(Modifier.width(8.dp))
-            androidx.compose.material3.Icon(
+            Icon(
                 imageVector = Icons.Filled.ExpandMore,
                 contentDescription = "Abrir",
                 tint = TextSecondary
@@ -207,25 +227,16 @@ private fun SubcategoriaFilterDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .background(CardGrayElevated)
+            modifier = Modifier.background(CardGrayElevated)
         ) {
-            // Opción "Todas"
             DropdownMenuItem(
                 text = { Text("Todas", color = TextPrimary) },
-                onClick = {
-                    onChange(null)
-                    expanded = false
-                }
+                onClick = { onChange(null); expanded = false }
             )
-            // Opciones de subcategoría
-            opciones.forEach { sub ->
+            opciones.forEach { op ->
                 DropdownMenuItem(
-                    text = { Text(sub, color = TextPrimary) },
-                    onClick = {
-                        onChange(sub)
-                        expanded = false
-                    }
+                    text = { Text(op, color = TextPrimary) },
+                    onClick = { onChange(op); expanded = false }
                 )
             }
         }
@@ -233,7 +244,7 @@ private fun SubcategoriaFilterDropdown(
 }
 
 // ------------------------
-// grilla con animación al cambiar tab
+// Grilla Animada
 // ------------------------
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -242,28 +253,19 @@ private fun AnimatedProductGrid(
     productos: List<ProductoUi>,
     onProductoClick: (ProductoUi) -> Unit
 ) {
-    fun Filtro.idx(): Int = when (this) {
-        Filtro.TODOS -> 0
-        Filtro.HOMBRES -> 1
-        Filtro.MUJERES -> 2
-    }
+    fun Filtro.idx() = ordinal
 
     AnimatedContent(
         targetState = filtro,
         transitionSpec = {
             val right = targetState.idx() > initialState.idx()
-            val slideIn = slideInHorizontally(
-                tween(300, easing = FastOutSlowInEasing)
-            ) { full -> if (right) +full else -full }
-            val slideOut = slideOutHorizontally(
-                tween(300, easing = FastOutSlowInEasing)
-            ) { full -> if (right) -full else +full }
+            val slideIn = slideInHorizontally(tween(300)) { if (right) it else -it }
+            val slideOut = slideOutHorizontally(tween(300)) { if (right) -it else it }
             (slideIn + fadeIn()) togetherWith (slideOut + fadeOut())
         },
-        label = "gridTransition"
+        label = "gridTrans"
     ) { current ->
-        // Usa el parámetro para evitar warning de "Target state parameter is not used"
-        androidx.compose.runtime.key(current) {
+        key(current) {
             LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
                 contentPadding = PaddingValues(16.dp),
@@ -276,8 +278,8 @@ private fun AnimatedProductGrid(
                         producto = p,
                         onClick = { onProductoClick(p) },
                         modifier = Modifier.animateItem(
-                            fadeInSpec = tween(300, easing = FastOutSlowInEasing),
-                            fadeOutSpec = tween(300, easing = FastOutSlowInEasing)
+                            fadeInSpec = tween(300),
+                            fadeOutSpec = tween(300)
                         )
                     )
                 }
@@ -287,147 +289,7 @@ private fun AnimatedProductGrid(
 }
 
 // ------------------------
-// grilla de carga shimmer
-// ------------------------
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun SkeletonGrid(skeletonCount: Int = 8) {
-    val placeholders = remember { List(skeletonCount) { it } }
-
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(2),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        modifier = Modifier.fillMaxSize()
-    ) {
-        items(placeholders) { _ ->
-            SkeletonCard(
-                modifier = Modifier.animateItem(
-                    fadeInSpec = tween(280, easing = FastOutSlowInEasing),
-                    fadeOutSpec = tween(200, easing = FastOutSlowInEasing)
-                )
-            )
-        }
-    }
-}
-
-// ------------------------
-// shimmer brush
-// ------------------------
-@Composable
-private fun rememberShimmerBrush(): Brush {
-    val colors = listOf(Color(0xFF2A2A2A), Color(0xFF3A3A3A), Color(0xFF2A2A2A))
-    val transition = rememberInfiniteTransition(label = "skeletonShimmer")
-    val progress by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "skeletonShift"
-    )
-    val startX = progress * 600f
-    val endX = startX + 300f
-    return Brush.linearGradient(colors, Offset(startX, 0f), Offset(endX, 0f))
-}
-
-// ------------------------
-// card placeholder
-// ------------------------
-@Composable
-private fun SkeletonCard(modifier: Modifier = Modifier) {
-    val shimmer = rememberShimmerBrush()
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(CardGray)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(160.dp)
-                .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                .background(shimmer)
-        )
-        Column(Modifier.padding(12.dp)) {
-            Box(
-                Modifier
-                    .fillMaxWidth(0.85f)
-                    .height(18.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(shimmer)
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                Modifier
-                    .fillMaxWidth(0.45f)
-                    .height(14.dp)
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(shimmer)
-            )
-        }
-    }
-}
-
-// ------------------------
-// tabs con animación
-// ------------------------
-@Composable
-private fun TabsAnimated(selected: Filtro, onSelect: (Filtro) -> Unit) {
-    val items = listOf(
-        Filtro.TODOS to "Principal",
-        Filtro.HOMBRES to "Hombres",
-        Filtro.MUJERES to "Mujeres"
-    )
-
-    val tabWidth: Dp = 100.dp
-    val idx = items.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val offset by animateFloatAsState(idx * tabWidth.value, tween(350), label = "")
-    val width by animateDpAsState(tabWidth, tween(350), label = "")
-
-    Box(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            items.forEachIndexed { i, (f, t) ->
-                val sel = i == idx
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .width(tabWidth)
-                        .clickable { onSelect(f) }
-                        .padding(vertical = 8.dp)
-                ) {
-                    Text(
-                        text = t,
-                        color = if (sel) TextPrimary else TextSecondary,
-                        fontSize = 16.sp,
-                        fontWeight = if (sel) FontWeight.SemiBold else FontWeight.Medium
-                    )
-                    Spacer(Modifier.height(10.dp))
-                }
-            }
-        }
-
-        Box(
-            Modifier
-                .padding(horizontal = 20.dp)
-                .height(2.dp)
-                .width(width)
-                .offset(x = offset.dp)
-                .background(Color.White)
-                .zIndex(1f)
-        )
-    }
-}
-
-// ------------------------
-// card de producto
+// Tarjeta de Producto
 // ------------------------
 @Composable
 private fun ProductCard(
@@ -435,16 +297,11 @@ private fun ProductCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val ctx = LocalContext.current
-    val drawableName = when (producto.categoria.lowercase()) {
-        "polera" -> "ph_polera"
-        "chaqueta" -> "ph_chaqueta"
-        "pantalon" -> "ph_pantalon"
-        "zapatilla", "zapatillas" -> "ph_zapatillas"
-        "accesorio" -> "ph_accesorio"
-        else -> "ph_polera"
-    }
-    val imgId = remember(drawableName) { ctx.safeDrawableId(drawableName) }
+    // La primera imagen del backend (normalmente la primaria)
+    val imageUrl = producto.dtoOriginal
+        ?.images
+        ?.firstOrNull()
+        ?.publicUrl   // ← tu campo real
 
     Column(
         modifier = modifier
@@ -459,45 +316,108 @@ private fun ProductCard(
                 .background(CardGrayElevated),
             contentAlignment = Alignment.Center
         ) {
-            if (imgId != 0) {
-                Image(
-                    painter = painterResource(id = imgId),
+            if (imageUrl != null) {
+                AsyncImage(
+                    model = imageUrl,
                     contentDescription = producto.nombre,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(8.dp)
+                        .padding(12.dp)
                         .clip(RoundedCornerShape(12.dp)),
                     contentScale = ContentScale.Crop
                 )
             } else {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF2E2E2E))
-                )
+                Text("Sin imagen", color = Color.Gray)
             }
         }
 
         Column(Modifier.padding(12.dp)) {
-            Text(
-                producto.nombre,
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            Spacer(Modifier.height(4.dp))
-            Text(producto.precio, color = TextSecondary, fontSize = 14.sp)
+            Text(producto.nombre, color = TextPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+            Text(producto.categoria, color = TextSecondary, fontSize = 12.sp)
+            Text(producto.precio, color = TextPrimary, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         }
     }
 }
 
+
+
+
+
+
 // ------------------------
-// helpers
+// Skeletons y Helpers
 // ------------------------
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SkeletonGrid(skeletonCount: Int = 8) {
+    val placeholders = remember { List(skeletonCount) { it } }
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(2),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        modifier = Modifier.fillMaxSize()
+    ) {
+        items(placeholders) { SkeletonCard() }
+    }
+}
+
+@Composable
+private fun rememberShimmerBrush(): Brush {
+    val colors = listOf(Color(0xFF2A2A2A), Color(0xFF3A3A3A), Color(0xFF2A2A2A))
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val progress by transition.animateFloat(
+        initialValue = 0f, targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(1000), RepeatMode.Restart),
+        label = "prog"
+    )
+    val startX = progress * 1000f
+    return Brush.linearGradient(colors, Offset(startX, 0f), Offset(startX + 500f, 0f))
+}
+
+@Composable
+private fun SkeletonCard() {
+    val shimmer = rememberShimmerBrush()
+    Column(Modifier.clip(RoundedCornerShape(16.dp)).background(CardGray)) {
+        Box(Modifier.fillMaxWidth().height(160.dp).background(shimmer))
+        Column(Modifier.padding(12.dp)) {
+            Box(Modifier.fillMaxWidth(0.8f).height(18.dp).clip(RoundedCornerShape(6.dp)).background(shimmer))
+            Spacer(Modifier.height(8.dp))
+            Box(Modifier.fillMaxWidth(0.4f).height(14.dp).clip(RoundedCornerShape(6.dp)).background(shimmer))
+        }
+    }
+}
+
+@Composable
+private fun TabsAnimated(selected: Filtro, onSelect: (Filtro) -> Unit) {
+    val items = listOf(Filtro.TODOS to "Principal", Filtro.HOMBRES to "Hombres", Filtro.MUJERES to "Mujeres")
+    val tabWidth = 100.dp
+    val idx = items.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val offset by animateFloatAsState(idx * tabWidth.value, tween(300), label = "")
+
+    Box(Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(horizontal = 16.dp)) {
+            items.forEach { (f, t) ->
+                Column(
+                    modifier = Modifier.width(tabWidth).clickable { onSelect(f) }.padding(vertical = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = t,
+                        color = if (f == selected) TextPrimary else TextSecondary,
+                        fontWeight = if (f == selected) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
+            }
+        }
+        Box(
+            Modifier.padding(horizontal = 16.dp).height(3.dp).width(tabWidth)
+                .offset(x = offset.dp).align(Alignment.BottomStart).background(Color.White)
+        )
+    }
+}
+
 private fun Resources.safeGetIdentifier(name: String, defType: String, defPackage: String): Int {
     return try { getIdentifier(name, defType, defPackage) } catch (_: Exception) { 0 }
 }

@@ -127,5 +127,6 @@ dependencies {
     androidTestImplementation("androidx.test:rules:1.5.0")
     // GPS (Fused Location Provider)
     implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation("io.coil-kt:coil-compose:2.5.0")
 
 }

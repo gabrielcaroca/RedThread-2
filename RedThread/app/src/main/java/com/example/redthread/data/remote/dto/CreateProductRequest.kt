@@ -5,5 +5,7 @@ data class CreateProductRequest(
     val brandId: Int,
     val name: String,
     val description: String?,
-    val basePrice: Int
+    val basePrice: Int,
+    val featured: Boolean,
+    val gender: String
 )

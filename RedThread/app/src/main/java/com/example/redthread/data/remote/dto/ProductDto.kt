@@ -8,5 +8,7 @@ data class ProductDto(
     val active: Boolean,
     val images: List<ImageDto>?,
     val category: CategoryDto?,
-    val brand: BrandDto?
+    val brand: BrandDto?,
+    val featured: Boolean,
+    val gender: String
 )

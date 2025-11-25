@@ -37,13 +37,9 @@ fun AppNavGraph(
     val cartCount by cartVm.count.collectAsState()
 
     LaunchedEffect(header.isLoggedIn, header.email) {
-        if (header.isLoggedIn) {
-            cartVm.refreshFromBackendIfLogged()
-        } else {
-            cartVm.clear() // limpia UI local si no hay sesión
-        }
+        if (header.isLoggedIn) cartVm.refreshFromBackendIfLogged()
+        else cartVm.clear()
     }
-
 
     Scaffold(
         topBar = {
@@ -55,15 +51,12 @@ fun AppNavGraph(
                     }
                 },
                 onPerfilClick = {
-                    if (authViewModel.header.value.isLoggedIn) {
+                    if (authViewModel.header.value.isLoggedIn)
                         navController.navigate(Route.Perfil.path)
-                    } else {
+                    else
                         navController.navigate(Route.Login.path)
-                    }
                 },
-                onCarritoClick = {
-                    navController.navigate(Route.Carrito.path)
-                },
+                onCarritoClick = { navController.navigate(Route.Carrito.path) },
                 cartCount = cartCount
             )
         },
@@ -78,9 +71,18 @@ fun AppNavGraph(
                 .background(Black)
         ) {
 
-            // HOME
+            // ============================================================
+            // HOME (ARREGLADO — antes causaba el crash)
+            // ============================================================
             composable(Route.Home.path) {
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val catalogVm: CatalogViewModel = viewModel(factory = factory)
+
                 HomeScreen(
+                    catalogVm = catalogVm,
                     onProductoClick = { p ->
                         val nombre = URLEncoder.encode(p.nombre, StandardCharsets.UTF_8.toString())
                         val precio = URLEncoder.encode(p.precio, StandardCharsets.UTF_8.toString())
@@ -90,9 +92,7 @@ fun AppNavGraph(
                             "${Route.ProductoDetalle.path}?id=${p.id}&nombre=$nombre&precio=$precio&categoria=$categoria"
                         )
                     },
-                    onCarritoClick = {
-                        navController.navigate(Route.Carrito.path)
-                    }
+                    onCarritoClick = { navController.navigate(Route.Carrito.path) }
                 )
             }
 
@@ -193,7 +193,9 @@ fun AppNavGraph(
                 )
             }
 
-            // ADMIN
+            // ============================================================
+            // ADMIN (Vista Moderador)
+            // ============================================================
             composable(Route.VistaModerador.path) {
 
                 val app = LocalContext.current.applicationContext as Application
@@ -212,17 +214,17 @@ fun AppNavGraph(
                 )
             }
 
-            // ✅ DESPACHADOR (antes NO existía, por eso crasheaba)
+            // DESPACHADOR
             composable(Route.Despachador.path) {
                 DespachadorScreen()
             }
 
-            // HISTORIAL
+            // HISTORIAL COMPRAS
             composable(Route.HistorialCompras.path) {
                 HistorialComprasScreen(navController)
             }
 
-            // ✅ DETALLE COMPRA (la usas desde Historial)
+            // DETALLE COMPRA
             composable(
                 route = Route.DetalleCompra.path + "/{id}/{fecha}/{total}/{productos}",
                 arguments = listOf(
@@ -287,13 +289,9 @@ fun AppNavGraph(
                 )
             }
 
-            //
-            // ============================================
-            // CATÁLOGO
-            // ============================================
-            //
-
+            // ============================================================
             // CREAR PRODUCTO
+            // ============================================================
             composable(Route.CrearProducto.path) {
 
                 val app = LocalContext.current.applicationContext as Application
