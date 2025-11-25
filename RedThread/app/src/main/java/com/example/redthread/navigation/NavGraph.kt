@@ -268,13 +268,10 @@ fun AppNavGraph(
                     precio = dec(backStack.arguments?.getString("precio")),
                     categoria = dec(backStack.arguments?.getString("categoria")),
                     cartVm = cartVm,
-                    onAddedToCart = {
-                        navController.navigate(Route.Home.path) {
-                            launchSingleTop = true
-                            popUpTo(Route.Home.path) { inclusive = false }
-                        }
-                    }
+                    onAddedToCart = {},
+                    nav = navController                      // ← agregado
                 )
+
             }
 
             // FORGOT PASSWORD
