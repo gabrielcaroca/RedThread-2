@@ -4,9 +4,15 @@ import com.redthread.catalog.controller.dto.CreateVariantReq;
 import com.redthread.catalog.model.Variant;
 import com.redthread.catalog.repository.VariantRepository;
 import com.redthread.catalog.service.VariantService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,27 +24,55 @@ import java.util.Map;
 @RestController
 @RequestMapping("/variants")
 @RequiredArgsConstructor
+@Tag(name = "Variants", description = "Variantes por producto (talla/color/SKU/precio override) + stock inicial")
 public class VariantController {
+
     private final VariantService service;
     private final VariantRepository repo;
 
     @PostMapping
+    @Operation(
+            summary = "Crear variante",
+            description = "Crea una variante asociada a un producto. "
+                    + "Si no se envía sku, se genera automáticamente. "
+                    + "Crea inventario con stock inicial (stock)."
+    )
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Variante creada",
+                    content = @Content(schema = @Schema(implementation = Variant.class))),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos / talla inválida"),
+            @ApiResponse(responseCode = "404", description = "Producto no existe"),
+            @ApiResponse(responseCode = "409", description = "Variante duplicada")
+    })
     public ResponseEntity<Variant> create(@RequestBody @Valid CreateVariantReq req) {
         Variant created = service.create(req);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
-    public Variant get(@PathVariable Long id) {
+    @Operation(summary = "Obtener variante por id")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Variante encontrada",
+                    content = @Content(schema = @Schema(implementation = Variant.class))),
+            @ApiResponse(responseCode = "404", description = "Variante no existe")
+    })
+    public Variant get(@Parameter(description = "ID de la variante") @PathVariable Long id) {
         return service.get(id);
     }
 
     @GetMapping
-    public List<Variant> list(@RequestParam Long productId) {
+    @Operation(summary = "Listar variantes por producto")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Listado de variantes")
+    })
+    public List<Variant> list(
+            @Parameter(description = "ID del producto padre") @RequestParam Long productId
+    ) {
         return service.byProduct(productId);
     }
 
     @GetMapping("/todos")
+    @Operation(summary = "Listar todas las variantes (debug)")
     public List<Variant> all() {
         return repo.findAll();
     }
@@ -49,5 +83,4 @@ public class VariantController {
                 .status(ex.getStatusCode())
                 .body(Map.of("message", ex.getReason()));
     }
-
 }

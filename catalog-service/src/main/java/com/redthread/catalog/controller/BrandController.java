@@ -3,12 +3,18 @@ package com.redthread.catalog.controller;
 import com.redthread.catalog.controller.dto.CreateBrandReq;
 import com.redthread.catalog.model.Brand;
 import com.redthread.catalog.service.BrandService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
 
 import java.util.List;
 import java.util.Map;
@@ -16,32 +22,43 @@ import java.util.Map;
 @RestController
 @RequestMapping("/brands")
 @RequiredArgsConstructor
+@Tag(name = "Brands", description = "Marcas de productos")
 public class BrandController {
 
     private final BrandService service;
 
     @PostMapping
-    public Brand create(@RequestBody @Valid CreateBrandReq req) {
-        return service.create(req.name());
+    @Operation(summary = "Crear marca")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Marca creada",
+                    content = @Content(schema = @Schema(implementation = Brand.class))),
+            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+            @ApiResponse(responseCode = "409", description = "Marca duplicada")
+    })
+    public ResponseEntity<Brand> create(@RequestBody @Valid CreateBrandReq req) {
+        Brand created = service.create(req.name());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
-    public Brand get(@PathVariable Long id) {
+    @Operation(summary = "Obtener marca por id")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Marca encontrada",
+                    content = @Content(schema = @Schema(implementation = Brand.class))),
+            @ApiResponse(responseCode = "404", description = "Marca no existe")
+    })
+    public Brand get(@Parameter(description = "ID de marca") @PathVariable Long id) {
         return service.get(id);
     }
 
     @GetMapping
-    public List<Brand> getAll() {
+    @Operation(summary = "Listar marcas")
+    public List<Brand> list() {
         return service.getAll();
     }
 
-    /**
-     * Este es el manejador de errores.
-     * Captura la 'IllegalArgumentException' que lanza tu servicio
-     * y la convierte en un error 400 (Bad Request) con un JSON.
-     */
+    @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, String>> handleIllegalArgumentException(IllegalArgumentException ex) {
-        // Devuelve un error 400 (BAD_REQUEST)
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of("error", ex.getMessage()));

@@ -6,8 +6,8 @@ adb reverse tcp:8083 tcp:8083
 adb reverse tcp:8084 tcp:8084
 
 
-Revisar si los puertos
+Revisar si los puertos están abiertos mediante abd
 adb reverse --list
 
-Para resetear los puertos
+Para resetear los puertos abd
 adb reverse --remove-all

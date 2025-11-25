@@ -69,6 +69,7 @@
     <dependency>
       <groupId>org.postgresql</groupId>
       <artifactId>postgresql</artifactId>
+      <scope>runtime</scope>
     </dependency>
 
     <!-- Lombok -->
@@ -78,21 +79,46 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- Test -->
+    <!-- Actuator -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- commons-codec (lo mantengo tal cual) -->
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+      <version>1.16.0</version>
+    </dependency>
+
+    <!-- ✅ Swagger/OpenAPI UI -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.8.14</version>
+    </dependency>
+
+    <!-- ✅ H2 para tests -->
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Tests -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
     </dependency>
+
+    <!-- (Opcional recomendado si en tests usas seguridad con MockMvc) -->
     <dependency>
-    <groupId>commons-codec</groupId>
-    <artifactId>commons-codec</artifactId>
-    <version>1.16.0</version>
+      <groupId>org.springframework.security</groupId>
+      <artifactId>spring-security-test</artifactId>
+      <scope>test</scope>
     </dependency>
-    <dependency>
-    <groupId>org.springframework.boot</groupId>
-    <artifactId>spring-boot-starter-actuator</artifactId>
-</dependency>
 
   </dependencies>
 
@@ -105,7 +131,7 @@
         <version>${spring-boot.version}</version>
       </plugin>
 
-      <!-- Fija versión del compiler plugin para evitar warnings -->
+      <!-- Compiler -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -116,19 +142,21 @@
           <parameters>true</parameters>
         </configuration>
       </plugin>
+
+      <!-- Flyway Maven plugin -->
       <plugin>
-  <groupId>org.flywaydb</groupId>
-  <artifactId>flyway-maven-plugin</artifactId>
-  <version>11.7.2</version>
-  <configuration>
-    <url>jdbc:postgresql://localhost:5432/rt_catalog</url>
-    <user>postgres</user>
-    <password>123</password>
-    <schemas>
-      <schema>public</schema>
-    </schemas>
-  </configuration>
-</plugin>
+        <groupId>org.flywaydb</groupId>
+        <artifactId>flyway-maven-plugin</artifactId>
+        <version>11.7.2</version>
+        <configuration>
+          <url>jdbc:postgresql://localhost:5432/rt_catalog</url>
+          <user>postgres</user>
+          <password>123</password>
+          <schemas>
+            <schema>public</schema>
+          </schemas>
+        </configuration>
+      </plugin>
     </plugins>
   </build>
 </project>

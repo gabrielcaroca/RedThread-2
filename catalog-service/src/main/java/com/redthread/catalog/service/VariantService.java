@@ -4,19 +4,16 @@ import com.redthread.catalog.controller.dto.CreateVariantReq;
 import com.redthread.catalog.model.Inventory;
 import com.redthread.catalog.model.Product;
 import com.redthread.catalog.model.Variant;
-import com.redthread.catalog.model.enums.SizeType;
 import com.redthread.catalog.repository.InventoryRepository;
 import com.redthread.catalog.repository.ProductRepository;
 import com.redthread.catalog.repository.VariantRepository;
-
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,7 +34,11 @@ public class VariantService {
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
 
-        SizeValidator.validate(req.sizeType(), req.sizeValue());
+        try {
+            SizeValidator.validate(req.sizeType(), req.sizeValue());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
 
         boolean exists = variantRepo.existsByProductIdAndSizeTypeAndSizeValueAndColor(
                 req.productId(),
@@ -63,7 +64,7 @@ public class VariantService {
                 .sku(finalSku)
                 .priceOverride(req.priceOverride())
                 .active(true)
-                .createdAt(java.time.Instant.now())
+                .createdAt(Instant.now())
                 .build();
 
         Variant saved = variantRepo.save(v);
@@ -78,7 +79,7 @@ public class VariantService {
                         .variant(saved)
                         .stockAvailable(initialStock)
                         .stockReserved(0)
-                        .updatedAt(java.time.Instant.now())
+                        .updatedAt(Instant.now())
                         .build()
         );
 
@@ -96,21 +97,35 @@ public class VariantService {
     }
 
     public Variant update(Long id, CreateVariantReq req) {
-
         Variant existing = variantRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variante no encontrada"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Variante no existe"));
+
+        Product product = productRepo.findById(req.productId())
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        try {
+            SizeValidator.validate(req.sizeType(), req.sizeValue());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+        }
 
         boolean exists = variantRepo.existsByProductIdAndSizeTypeAndSizeValueAndColor(
-                req.productId(), req.sizeType(), req.sizeValue(), req.color());
+                req.productId(),
+                req.sizeType(),
+                req.sizeValue().toUpperCase(),
+                req.color().toUpperCase()
+        );
 
         if (exists && !existing.getId().equals(id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Otra variante con esa combinación ya existe");
         }
 
+        existing.setProduct(product);
         existing.setSizeType(req.sizeType());
-        existing.setSizeValue(req.sizeValue());
-        existing.setColor(req.color());
+        existing.setSizeValue(req.sizeValue().toUpperCase());
+        existing.setColor(req.color().toUpperCase());
         existing.setSku(req.sku());
         existing.setPriceOverride(req.priceOverride());
 
