@@ -69,7 +69,6 @@ class CartViewModel(app: Application) : AndroidViewModel(app) {
             _items.value = enriched
             recomputeCount(enriched)
         } catch (_: Exception) {
-            // si algo falla no crashea, solo no refresca
         }
     }
 
@@ -96,7 +95,13 @@ class CartViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             try {
-                // logeado -> backend real
+                if (draft.variantId != null) {
+                    ApiClient.orders.addItem(AddItemReq(draft.variantId, draft.cantidad))
+                    refreshFromBackendIfLogged()
+                    return@launch
+                }
+
+                // logeado -> backend real (fallback si no viene variantId)
                 val variants = ApiClient.catalog.listVariantsByProduct(draft.productId)
                 val match = variants.firstOrNull {
                     it.sizeValue.equals(draft.talla, true) &&

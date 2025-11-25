@@ -9,8 +9,10 @@ import com.redthread.identity.repository.RoleRepository;
 import com.redthread.identity.repository.UserRepository;
 import com.redthread.identity.security.JwtService;
 import jakarta.transaction.Transactional;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.Set;
@@ -23,7 +25,10 @@ public class AuthService {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
 
-    public AuthService(UserRepository userRepo, RoleRepository roleRepo, PasswordEncoder encoder, JwtService jwt) {
+    public AuthService(UserRepository userRepo,
+                       RoleRepository roleRepo,
+                       PasswordEncoder encoder,
+                       JwtService jwt) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
         this.encoder = encoder;
@@ -32,37 +37,63 @@ public class AuthService {
 
     @Transactional
     public JwtResponse register(RegisterRequest req) {
-        if (userRepo.existsByEmail(req.getEmail())) {
-            throw new IllegalArgumentException("Email ya registrado");
+        String email = req.getEmail().toLowerCase().trim();
+
+        if (userRepo.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email ya registrado");
         }
 
-        Role roleCliente = roleRepo.findByKey("CLIENTE")
-                .orElseThrow(() -> new IllegalStateException("Role CLIENTE no existe"));
+        Role defaultRole = roleRepo.findByKey("CLIENTE")
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "Rol CLIENTE no existe"
+                ));
 
         User u = new User();
-        u.setEmail(req.getEmail().toLowerCase());
-        u.setFullName(req.getFullName());
-        u.setPassword(encoder.encode(req.getPassword())); // ← actualizado
-        u.setRoles(Set.of(roleCliente));
-        userRepo.save(u);
+        u.setEmail(email);
+        u.setFullName(req.getFullName().trim());
+        u.setPassword(encoder.encode(req.getPassword()));
+        u.setRoles(Set.of(defaultRole));
+
+        u = userRepo.save(u);
 
         String token = jwt.generate(u);
-        return new JwtResponse(token, Instant.now().plusSeconds(60L * 60L * 2L)); // 2 horas
+        Instant exp = Instant.now().plusSeconds(60L * 60L * 2L); // 2h
+        return new JwtResponse(token, exp);
     }
 
     public JwtResponse login(LoginRequest req) {
-        var u = userRepo.findByEmail(req.getEmail().toLowerCase())
-                .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));
+        String email = req.getEmail().toLowerCase().trim();
 
-        System.out.println("Usando encoder: " + encoder.getClass().getSimpleName());
-        System.out.println("Hash en BD: " + u.getPassword());
-        System.out.println("Password ingresada: " + req.getPassword());
+        User u = userRepo.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas"));
 
         if (!encoder.matches(req.getPassword(), u.getPassword())) {
-            throw new IllegalArgumentException("Credenciales inválidas");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Credenciales inválidas");
         }
 
         String token = jwt.generate(u);
-        return new JwtResponse(token, Instant.now().plusSeconds(60L * 60L * 2L));
+        Instant exp = Instant.now().plusSeconds(60L * 60L * 2L); // 2h
+        return new JwtResponse(token, exp);
+    }
+
+    public JwtResponse refresh(String token) {
+        if (!jwt.isValid(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token inválido o expirado");
+        }
+
+        Long userId = Long.valueOf(jwt.parse(token).getBody().getSubject());
+        User u = userRepo.findById(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Usuario no encontrado"));
+
+        String newToken = jwt.generate(u);
+        Instant exp = Instant.now().plusSeconds(60L * 60L * 2L);
+        return new JwtResponse(newToken, exp);
+    }
+
+    public void verify(String token) {
+        if (!jwt.isValid(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Token inválido o expirado");
+        }
     }
 }

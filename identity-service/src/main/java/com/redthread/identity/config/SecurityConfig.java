@@ -27,15 +27,31 @@ public class SecurityConfig {
         JwtAuthFilter jwtFilter = new JwtAuthFilter(jwtService, userRepository);
 
         http
-                .cors(cors -> {}) // ✅ habilitar CORS
+                .cors(cors -> {}) // habilitar CORS
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+
+                        // ✅ Swagger / OpenAPI PUBLICO
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs.yaml"
+                        ).permitAll()
+
+                        // ✅ Endpoints publicos auth
                         .requestMatchers("/auth/**").permitAll()
+
+                        // (opcional pero recomendado) dejar /error publico para evitar loops raros
+                        .requestMatchers("/error").permitAll()
+
+                        // privados
                         .requestMatchers("/me").authenticated()
                         .requestMatchers("/addresses/**").hasAnyRole("CLIENTE", "ADMIN")
                         .requestMatchers("/users/**", "/roles/**").hasRole("ADMIN")
-                        .anyRequest().authenticated())
+                        .anyRequest().authenticated()
+                )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

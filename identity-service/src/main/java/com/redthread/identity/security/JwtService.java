@@ -1,6 +1,9 @@
 package com.redthread.identity.security;
 
+import com.redthread.identity.model.Role;
 import com.redthread.identity.model.User;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -8,7 +11,7 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets; // <-- IMPORTACIÓN AÑADIDA
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -25,14 +28,14 @@ public class JwtService {
 
     @PostConstruct
     void init() {
-        // LÍNEA MODIFICADA para usar UTF-8
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String generate(User user) {
         Instant now = Instant.now();
         Instant exp = now.plus(expiryMinutes, ChronoUnit.MINUTES);
-        String roles = user.getRoles().stream().map(r -> r.getKey()).collect(Collectors.joining(","));
+        String roles = user.getRoles().stream().map(Role::getKey).collect(Collectors.joining(","));
+
         return Jwts.builder()
                 .setSubject(String.valueOf(user.getId()))
                 .setIssuer(issuer)
@@ -43,6 +46,23 @@ public class JwtService {
                 .claim("roles", roles)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public Jws<Claims> parse(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .requireIssuer(issuer)
+                .build()
+                .parseClaimsJws(token);
+    }
+
+    public boolean isValid(String token) {
+        try {
+            parse(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     public Key getKey() { return key; }
