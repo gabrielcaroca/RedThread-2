@@ -48,8 +48,8 @@ public class SecurityConfig {
 
                         // privados
                         .requestMatchers("/me").authenticated()
-                        .requestMatchers("/addresses/**").hasAnyRole("CLIENTE", "ADMIN")
-                        .requestMatchers("/users/**", "/roles/**").hasRole("ADMIN")
+                        .requestMatchers("/addresses/**").hasAnyRole("CLIENTE", "ADMINISTRADOR")
+                        .requestMatchers("/admin/users/**", "/admin/roles/**").hasRole("ADMINISTRADOR")
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

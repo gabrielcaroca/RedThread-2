@@ -1,13 +1,17 @@
 package com.redthread.identity.controller;
 
+import com.redthread.identity.dto.UserListDto;
 import com.redthread.identity.model.User;
 import com.redthread.identity.model.Role;
 import com.redthread.identity.repository.UserRepository;
 import com.redthread.identity.repository.RoleRepository;
+import com.redthread.identity.service.UserService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -15,27 +19,39 @@ import java.util.List;
 
 @Tag(name = "Admin", description = "Operaciones administrativas: usuarios y roles")
 @RestController
-@RequestMapping
+@RequestMapping("/admin")  // <-- prefijo para todos los endpoints
 public class AdminController {
 
     private final UserRepository userRepo;
     private final RoleRepository roleRepo;
+    private final UserService userService;  // <-- AGREGADO
 
-    public AdminController(UserRepository userRepo, RoleRepository roleRepo) {
+    public AdminController(
+            UserRepository userRepo,
+            RoleRepository roleRepo,
+            UserService userService              // <-- AGREGADO
+    ) {
         this.userRepo = userRepo;
         this.roleRepo = roleRepo;
+        this.userService = userService;        // <-- AGREGADO
     }
 
+    // =======================
+    // LISTAR USUARIOS (DTO)
+    // =======================
     @Operation(summary = "Listar usuarios")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de usuarios"),
             @ApiResponse(responseCode = "403", description = "Solo ADMIN")
     })
     @GetMapping("/users")
-    public ResponseEntity<List<User>> listUsers() {
-        return ResponseEntity.ok(userRepo.findAll());
+    public ResponseEntity<List<UserListDto>> listUsers() {
+        return ResponseEntity.ok(userService.getAllUsers()); // <-- USANDO USERSERVICE
     }
 
+    // =======================
+    // USUARIO POR ID
+    // =======================
     @Operation(summary = "Obtener usuario por id")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Usuario encontrado"),
@@ -49,6 +65,9 @@ public class AdminController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    // =======================
+    // ASIGNAR ROL
+    // =======================
     @Operation(summary = "Asignar rol a usuario")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Rol asignado"),
@@ -56,15 +75,24 @@ public class AdminController {
             @ApiResponse(responseCode = "403", description = "Solo ADMIN")
     })
     @PostMapping("/users/{id}/roles/{roleKey}")
-    public ResponseEntity<User> addRole(@PathVariable Long id, @PathVariable String roleKey) {
+    public ResponseEntity<User> addRole(
+            @PathVariable Long id,
+            @PathVariable String roleKey
+    ) {
         User u = userRepo.findById(id).orElse(null);
         Role r = roleRepo.findByKey(roleKey).orElse(null);
-        if (u == null || r == null) return ResponseEntity.notFound().build();
+
+        if (u == null || r == null) {
+            return ResponseEntity.notFound().build();
+        }
 
         u.getRoles().add(r);
         return ResponseEntity.ok(userRepo.save(u));
     }
 
+    // =======================
+    // LISTAR ROLES
+    // =======================
     @Operation(summary = "Listar roles")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Lista de roles"),

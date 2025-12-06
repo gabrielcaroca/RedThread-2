@@ -1,10 +1,13 @@
 package com.redthread.catalog.controller;
 
-import com.redthread.catalog.model.ProductImage;
 import com.redthread.catalog.service.ImageStorageService;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,48 +24,71 @@ public class ProductImageController {
 
     private final ImageStorageService imageStorageService;
 
-    // ---- Subir imagen local ----
+    // =========================
+    // Subir archivo local
+    // =========================
     @PostMapping("/upload")
-    public ProductImage uploadLocal(
+    public ResponseEntity<Void> upload(
             @PathVariable Long productId,
-            @RequestParam("file") org.springframework.web.multipart.MultipartFile file
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(name = "primary", defaultValue = "true") boolean primary
     ) throws IOException {
-        return imageStorageService.store(productId, file, false);
+
+        // Guarda la imagen y crea ProductImage + relación con Product
+        imageStorageService.store(productId, file, primary);
+
+        // No devolvemos el ProductImage para evitar problemas de lazy loading
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
-    // ---- NUEVO: Subir imagen desde URL ----
+    // DTO para la URL remota
+    public record ImageUrlRequest(@NotBlank String url) {}
+
+    // =========================
+    // Subir imagen desde URL remota
+    // =========================
     @PostMapping("/from-url")
-    public ProductImage uploadFromUrl(
+    public ResponseEntity<Void> fromUrl(
             @PathVariable Long productId,
-            @RequestBody ImageUrlRequest req
+            @RequestBody @Valid ImageUrlRequest request,
+            @RequestParam(name = "primary", defaultValue = "true") boolean primary
     ) throws IOException {
-        if (req.url() == null || req.url().isBlank())
-            throw new IllegalArgumentException("URL vacía o inválida");
 
-        // Descargar imagen temporalmente
-        URI imageUri = URI.create(req.url());
-        String ext = getExt(req.url());
-        Path tempFile = Files.createTempFile("img_" + UUID.randomUUID(), "." + ext);
+        URI uri = URI.create(request.url());
+        String ext = getExt(request.url());
+        String fileName = UUID.randomUUID() + "." + ext;
 
-        try (InputStream in = imageUri.toURL().openStream()) {
-            Files.copy(in, tempFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        // Carpeta temporal para descargar la imagen
+        Path tempDir = Files.createTempDirectory("rt-img-" + Instant.now().toEpochMilli());
+        Path tempFile = tempDir.resolve(fileName);
+
+        try (InputStream in = uri.toURL().openStream()) {
+            Files.copy(in, tempFile);
         }
 
-        // Guardar usando el servicio
-        ProductImage saved = imageStorageService.storeFromPath(productId, tempFile, false);
+        try {
+            // Reutilizamos tu lógica central en el servicio
+            imageStorageService.storeFromPath(productId, tempFile, primary);
+        } finally {
+            // Limpiamos archivos temporales
+            Files.deleteIfExists(tempFile);
+            Files.deleteIfExists(tempDir);
+        }
 
-        // Borrar temporal
-        Files.deleteIfExists(tempFile);
-
-        return saved;
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    // =========================
+    // Auxiliar para sacar extensión
+    // =========================
     private String getExt(String url) {
         int i = url.lastIndexOf('.');
         String ext = (i > 0) ? url.substring(i + 1).toLowerCase() : "jpg";
-        if (ext.contains("?")) ext = ext.substring(0, ext.indexOf('?')); // limpia ?width etc.
+        // Limpiar query params tipo ?width=...
+        int q = ext.indexOf('?');
+        if (q >= 0) {
+            ext = ext.substring(0, q);
+        }
         return ext;
     }
-
-    public record ImageUrlRequest(@NotBlank String url) {}
 }

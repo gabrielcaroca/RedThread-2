@@ -37,11 +37,29 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults()) // habilita CORS
-            .csrf(csrf -> csrf.disable())    // desactiva CSRF
+            .cors(Customizer.withDefaults())
+            .csrf(csrf -> csrf.disable())
+            .oauth2ResourceServer(oauth -> oauth
+                .jwt(Customizer.withDefaults())
+            )
             .authorizeHttpRequests(reg -> reg
-                .anyRequest().permitAll()    // TODO: solo en desarrollo
+
+                // Rutas públicas
+                .requestMatchers("/categories/**").permitAll()
+                .requestMatchers("/brands/**").permitAll()
+                .requestMatchers("/products/**").permitAll()
+                .requestMatchers("/images/**").permitAll()
+
+                // Variants GET → público (tienda)
+                .requestMatchers("/variants").permitAll()
+                .requestMatchers("/variants/*").permitAll()
+
+                // Variants POST → requiere token
+                .requestMatchers("/variants").authenticated()
+
+                .anyRequest().authenticated()
             );
+
         return http.build();
     }
 
@@ -52,14 +70,13 @@ public class SecurityConfig {
         return decoder;
     }
 
-    // Configuración global de CORS
     @Bean
     public WebMvcConfigurer corsConfigurer() {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 registry.addMapping("/**")
-                        .allowedOrigins("http://localhost:5173") // tu frontend
+                        .allowedOrigins("http://localhost:5173")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(true);

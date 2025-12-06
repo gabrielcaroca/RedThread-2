@@ -39,14 +39,15 @@ public class VariantController {
     )
     @ApiResponses({
             @ApiResponse(responseCode = "201", description = "Variante creada",
-                    content = @Content(schema = @Schema(implementation = Variant.class))),
+                    content = @Content(schema = @Schema(implementation = Void.class))),
             @ApiResponse(responseCode = "400", description = "Datos inválidos / talla inválida"),
             @ApiResponse(responseCode = "404", description = "Producto no existe"),
             @ApiResponse(responseCode = "409", description = "Variante duplicada")
     })
-    public ResponseEntity<Variant> create(@RequestBody @Valid CreateVariantReq req) {
-        Variant created = service.create(req);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<Void> create(@RequestBody @Valid CreateVariantReq req) {
+        service.create(req);
+        // No devolvemos el objeto Variant para evitar problemas de lazy-loading (Category/Product)
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @GetMapping("/{id}")

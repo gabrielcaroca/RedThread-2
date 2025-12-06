@@ -16,13 +16,14 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(VariantController.class)
-@AutoConfigureMockMvc(addFilters = false) 
+@AutoConfigureMockMvc(addFilters = false)
 class VariantControllerTest {
 
     @Autowired MockMvc mvc;
@@ -33,16 +34,31 @@ class VariantControllerTest {
 
     @Test
     void create_returns201() throws Exception {
-        Variant v = Variant.builder().id(5L).sku("SKU-1").color("NEGRO").sizeValue("M").build();
+        // El controller ya no devuelve el objeto, pero igual mockeamos el service
+        Variant v = Variant.builder()
+                .id(5L)
+                .sku("SKU-1")
+                .color("NEGRO")
+                .sizeValue("M")
+                .build();
+
         when(service.create(any(CreateVariantReq.class))).thenReturn(v);
 
-        CreateVariantReq req = new CreateVariantReq(10L, SizeType.LETTER, "M", "NEGRO", null, null, 2);
+        CreateVariantReq req = new CreateVariantReq(
+                10L,
+                SizeType.LETTER,
+                "M",
+                "NEGRO",
+                null,
+                2
+        );
 
         mvc.perform(post("/variants")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(req)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(5L));
+                // ahora el endpoint devuelve ResponseEntity<Void>, por lo que el cuerpo es vacío
+                .andExpect(content().string(""));
     }
 
     @Test

@@ -26,26 +26,24 @@ public class ProductService {
 
     // CREATE
     public Product create(Long categoryId,
-                          Long brandId,
-                          String name,
-                          String description,
-                          BigDecimal basePrice,
-                          boolean featured,
-                          ProductGender gender) {
+            Long brandId,
+            String name,
+            String description,
+            BigDecimal basePrice,
+            boolean featured,
+            ProductGender gender) {
 
         if (basePrice == null || basePrice.signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Precio base inválido");
         }
 
         Category cat = categoryRepo.findById(categoryId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
 
         Brand brand = null;
         if (brandId != null) {
             brand = brandRepo.findById(brandId)
-                    .orElseThrow(() ->
-                            new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
         }
 
         Product p = Product.builder()
@@ -59,37 +57,38 @@ public class ProductService {
                 .gender(gender)
                 .createdAt(Instant.now())
                 .build();
-
+        
         return productRepo.save(p);
+    }
+
+    public List<Product> getAll() {
+        return productRepo.findAll();
     }
 
     // UPDATE
     public Product update(Long id,
-                          Long categoryId,
-                          Long brandId,
-                          String name,
-                          String description,
-                          BigDecimal basePrice,
-                          boolean featured,
-                          ProductGender gender) {
+            Long categoryId,
+            Long brandId,
+            String name,
+            String description,
+            BigDecimal basePrice,
+            boolean featured,
+            ProductGender gender) {
 
         Product existing = productRepo.findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no existe"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no existe"));
 
         if (basePrice == null || basePrice.signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Precio base inválido");
         }
 
         Category cat = categoryRepo.findById(categoryId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
 
         Brand brand = null;
         if (brandId != null) {
             brand = brandRepo.findById(brandId)
-                    .orElseThrow(() ->
-                            new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
         }
 
         existing.setCategory(cat);
