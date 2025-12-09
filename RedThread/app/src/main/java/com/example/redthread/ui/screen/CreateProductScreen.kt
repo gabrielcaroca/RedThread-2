@@ -38,8 +38,8 @@ fun CreateProductScreen(
     var featured by remember { mutableStateOf(false) }
 
     // Opciones del enum ProductGender
-    val genderOptions = listOf("MALE", "FEMALE", "UNISEX")
-    val genderLabels = listOf("Hombre", "Mujer", "Unisex")
+    val genderOptions = listOf("HOMBRE", "MUJER")
+    val genderLabels = listOf("Hombre", "Mujer")
     var selectedGenderIndex by remember { mutableStateOf(-1) }
 
     Column(

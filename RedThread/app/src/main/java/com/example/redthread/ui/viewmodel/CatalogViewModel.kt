@@ -174,10 +174,18 @@ class CatalogViewModel(
             onSuccess(result)
             _success.value = "OK"
 
+        } catch (e: retrofit2.HttpException) {
+            val code = e.code()
+            val body = e.response()?.errorBody()?.string()
+            _error.value = "HTTP $code: $body"
+            android.util.Log.e("CatalogVM", "HTTP ERROR: $code\n$body")
+
         } catch (e: Exception) {
             _error.value = e.message ?: "Error desconocido"
+            android.util.Log.e("CatalogVM", "ERROR:", e)
         } finally {
             _loading.value = false
         }
     }
+
 }
