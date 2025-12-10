@@ -22,7 +22,8 @@ enum class DevTab { PRODUCTOS, PEDIDOS, RUTAS }
 fun DeveloperScreen(
     vm: DeveloperViewModel,
     catalogVm: CatalogViewModel,
-    onCreateProduct: () -> Unit
+    onCreateProduct: () -> Unit,
+    onEditProduct: (Int) -> Unit
 ) {
     var tab by remember { mutableStateOf(DevTab.PRODUCTOS) }
 
@@ -41,7 +42,11 @@ fun DeveloperScreen(
         Spacer(Modifier.height(12.dp))
 
         when (tab) {
-            DevTab.PRODUCTOS -> ProductsTab(catalogVm, onCreateProduct)
+            DevTab.PRODUCTOS -> ProductsTab(
+                catalogVm = catalogVm,
+                onCreateProduct = onCreateProduct,
+                onEditProduct = onEditProduct
+            )
 
             DevTab.PEDIDOS -> OrdersTab(
                 vmPedido = viewModel(),
@@ -52,6 +57,7 @@ fun DeveloperScreen(
                 vmRuta = viewModel()
             )
         }
+
     }
 }
 
@@ -62,7 +68,8 @@ fun DeveloperScreen(
 @Composable
 fun ProductsTab(
     catalogVm: CatalogViewModel,
-    onCreateProduct: () -> Unit
+    onCreateProduct: () -> Unit,
+    onEditProduct: (Int) -> Unit
 ) {
     LaunchedEffect(Unit) {
         catalogVm.loadProducts()
@@ -98,15 +105,22 @@ fun ProductsTab(
 
         LazyColumn {
             items(productos.sortedBy { it.name.lowercase() }) { p ->
-                ProductRowRemote(p)
+                ProductRowRemote(
+                    p = p,
+                    onEditProduct = onEditProduct
+                )
                 Divider()
             }
         }
+
     }
 }
 
 @Composable
-fun ProductRowRemote(p: ProductDto) {
+fun ProductRowRemote(
+    p: ProductDto,
+    onEditProduct: (Int) -> Unit
+) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -121,7 +135,7 @@ fun ProductRowRemote(p: ProductDto) {
             horizontalArrangement = Arrangement.End
         ) {
             Button(
-                onClick = { /* TODO editar */ },
+                onClick = { onEditProduct(p.id) },  // 👈 AHORA SÍ HACE ALGO
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 modifier = Modifier.height(32.dp)
             ) {
@@ -130,6 +144,7 @@ fun ProductRowRemote(p: ProductDto) {
         }
     }
 }
+
 
 //////////////////////////////////////////////////////////////////
 // PEDIDOS
