@@ -1,6 +1,8 @@
 package com.redthread.catalog.controller;
 
 import com.redthread.catalog.controller.dto.CreateVariantReq;
+import com.redthread.catalog.controller.dto.VariantDto;
+import com.redthread.catalog.controller.dto.VariantMapper;
 import com.redthread.catalog.model.Variant;
 import com.redthread.catalog.repository.VariantRepository;
 import com.redthread.catalog.service.VariantService;
@@ -31,24 +33,27 @@ public class VariantController {
     private final VariantRepository repo;
 
     @PostMapping
-    @Operation(
-            summary = "Crear variante",
-            description = "Crea una variante asociada a un producto. "
-                    + "Si no se envía sku, se genera automáticamente. "
-                    + "Crea inventario con stock inicial (stock)."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Variante creada",
-                    content = @Content(schema = @Schema(implementation = Void.class))),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos / talla inválida"),
-            @ApiResponse(responseCode = "404", description = "Producto no existe"),
-            @ApiResponse(responseCode = "409", description = "Variante duplicada")
-    })
-    public ResponseEntity<Void> create(@RequestBody @Valid CreateVariantReq req) {
-        service.create(req);
-        // No devolvemos el objeto Variant para evitar problemas de lazy-loading (Category/Product)
-        return ResponseEntity.status(HttpStatus.CREATED).build();
-    }
+@Operation(
+        summary = "Crear variante",
+        description = "Crea una variante asociada a un producto. "
+                + "Si no se envía sku, se genera automáticamente. "
+                + "Crea inventario con stock inicial (stock)."
+)
+@ApiResponses({
+        @ApiResponse(responseCode = "201", description = "Variante creada",
+                content = @Content(schema = @Schema(implementation = VariantDto.class))),
+        @ApiResponse(responseCode = "400", description = "Datos inválidos / talla inválida"),
+        @ApiResponse(responseCode = "404", description = "Producto no existe"),
+        @ApiResponse(responseCode = "409", description = "Variante duplicada")
+})
+public ResponseEntity<VariantDto> create(@RequestBody @Valid CreateVariantReq req) {
+
+    Variant saved = service.create(req);
+    VariantDto dto = VariantMapper.toDto(saved);
+
+    return ResponseEntity.status(HttpStatus.CREATED).body(dto);
+}
+
 
     @GetMapping("/{id}")
     @Operation(summary = "Obtener variante por id")
