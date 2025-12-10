@@ -2,6 +2,7 @@ package com.redthread.catalog.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redthread.catalog.controller.dto.CreateVariantReq;
+import com.redthread.catalog.model.Product;
 import com.redthread.catalog.model.Variant;
 import com.redthread.catalog.model.enums.SizeType;
 import com.redthread.catalog.repository.VariantRepository;
@@ -34,9 +35,10 @@ class VariantControllerTest {
 
     @Test
     void create_returns201() throws Exception {
-        // El controller ya no devuelve el objeto, pero igual mockeamos el service
         Variant v = Variant.builder()
                 .id(5L)
+                .product(Product.builder().id(10L).build())
+                .sizeType(SizeType.LETTER)
                 .sku("SKU-1")
                 .color("NEGRO")
                 .sizeValue("M")
@@ -56,9 +58,7 @@ class VariantControllerTest {
         mvc.perform(post("/variants")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(req)))
-                .andExpect(status().isCreated())
-                // ahora el endpoint devuelve ResponseEntity<Void>, por lo que el cuerpo es vacío
-                .andExpect(content().string(""));
+                .andExpect(status().isCreated());
     }
 
     @Test

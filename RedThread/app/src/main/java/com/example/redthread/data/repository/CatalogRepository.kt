@@ -4,7 +4,9 @@ import com.example.redthread.data.remote.CatalogApi
 import com.example.redthread.data.remote.dto.*
 import okhttp3.MultipartBody
 
-class CatalogRepository(private val api: CatalogApi) {
+class CatalogRepository(
+    private val api: CatalogApi
+) {
 
     // CATEGORÍAS
     suspend fun getCategories() = api.listCategories()
@@ -16,7 +18,6 @@ class CatalogRepository(private val api: CatalogApi) {
     suspend fun getProducts() = api.listProducts()
 
     suspend fun getProduct(id: Int) = api.getProduct(id)
-
 
     suspend fun createProduct(req: CreateProductRequest) =
         api.createProduct(req)
@@ -35,7 +36,7 @@ class CatalogRepository(private val api: CatalogApi) {
     suspend fun uploadImage(id: Int, body: MultipartBody.Part) =
         api.uploadImage(id, body)
 
-    // IMÁGENES DESDE URL (CORRECTO)
+    // IMÁGENES DESDE URL
     suspend fun uploadImageFromUrl(id: Int, url: String) =
         api.uploadImageFromUrl(id, UploadImageUrlRequest(url))
 }

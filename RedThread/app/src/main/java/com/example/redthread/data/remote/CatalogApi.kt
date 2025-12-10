@@ -6,23 +6,37 @@ import retrofit2.http.*
 
 interface CatalogApi {
 
+    // ============================
     // CATEGORÍAS
+    // ============================
     @GET("categories")
     suspend fun listCategories(): List<CategoryDto>
 
+    // ============================
     // MARCAS
+    // ============================
     @GET("brands")
     suspend fun listBrands(): List<BrandDto>
 
+    // ============================
     // PRODUCTOS
+    // ============================
     @GET("products")
-    suspend fun listProducts(): List<ProductDto>
+    suspend fun listProducts(
+        @Query("categoryId") categoryId: Int? = null,
+        @Query("gender") gender: String? = null,     // HOMBRE | MUJER (opcional, por si lo usas después)
+        @Query("featured") featured: Boolean? = null // true para home destacados (opcional)
+    ): List<ProductDto>
 
     @GET("products/{id}")
-    suspend fun getProduct(@Path("id") id: Int): ProductDto
+    suspend fun getProduct(
+        @Path("id") id: Int
+    ): ProductDto
 
     @POST("products")
-    suspend fun createProduct(@Body req: CreateProductRequest): ProductDto
+    suspend fun createProduct(
+        @Body req: CreateProductRequest
+    ): ProductDto
 
     @PUT("products/{id}")
     suspend fun updateProduct(
@@ -31,18 +45,35 @@ interface CatalogApi {
     ): ProductDto
 
     @DELETE("products/{id}")
-    suspend fun deleteProduct(@Path("id") id: Int)
+    suspend fun deleteProduct(
+        @Path("id") id: Int
+    )
 
+    // ============================
     // VARIANTES
+    // ============================
     @GET("variants")
-    suspend fun listVariantsByProduct(@Query("productId") productId: Int): List<VariantDto>
+    suspend fun listVariantsByProduct(
+        @Query("productId") productId: Int
+    ): List<VariantDto>
+
+    @GET("variants/{id}")
+    suspend fun getVariant(
+        @Path("id") id: Long
+    ): VariantDto
 
     @POST("variants")
-    suspend fun createVariant(@Body req: CreateVariantRequest): VariantDto
+    suspend fun createVariant(
+        @Body req: CreateVariantRequest
+    ): VariantDto
 
+    // ============================
     // IMÁGENES
+    // ============================
     @GET("products/{id}/images")
-    suspend fun listImages(@Path("id") productId: Int): List<ImageDto>
+    suspend fun listImages(
+        @Path("id") productId: Int
+    ): List<ImageDto>
 
     @Multipart
     @POST("products/{id}/images/upload")
@@ -68,8 +99,4 @@ interface CatalogApi {
         @Path("productId") productId: Int,
         @Path("imageId") imageId: Int
     )
-
-    @GET("variants/{id}")
-    suspend fun getVariant(@Path("id") id: Long): VariantDto
-
 }

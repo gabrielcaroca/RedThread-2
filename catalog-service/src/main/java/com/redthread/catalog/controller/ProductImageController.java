@@ -3,20 +3,17 @@ package com.redthread.catalog.controller;
 import com.redthread.catalog.controller.dto.ImageDto;
 import com.redthread.catalog.controller.dto.ImageMapper;
 import com.redthread.catalog.model.ProductImage;
+import com.redthread.catalog.repository.ProductImageRepository;
 import com.redthread.catalog.service.ImageStorageService;
-
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,6 +25,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -36,6 +34,32 @@ import java.util.UUID;
 public class ProductImageController {
 
     private final ImageStorageService imageStorageService;
+    private final ProductImageRepository imageRepo;
+
+    // ============================================================
+    // LISTAR IMÁGENES DE UN PRODUCTO (GET)
+    // ============================================================
+    @GetMapping
+    @Operation(
+            summary = "Listar imágenes de un producto",
+            description = "Devuelve todas las imágenes asociadas al producto, ordenadas por sortOrder."
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Listado de imágenes",
+                    content = @Content(schema = @Schema(implementation = ImageDto.class))
+            )
+    })
+    public List<ImageDto> list(
+            @Parameter(description = "ID del producto", example = "5")
+            @PathVariable Long productId
+    ) {
+        List<ProductImage> images = imageRepo.findByProductIdOrderBySortOrderAsc(productId);
+        return images.stream()
+                .map(ImageMapper::toDto)
+                .toList();
+    }
 
     // ============================================================
     // SUBIR ARCHIVO LOCAL
@@ -72,12 +96,10 @@ public class ProductImageController {
                 .body(ImageMapper.toDto(img));
     }
 
-
     // ============================================================
     // DTO para pedir imagen remota
     // ============================================================
     public record ImageUrlRequest(@NotBlank String url) {}
-
 
     // ============================================================
     // SUBIR IMAGEN DESDE UNA URL REMOTA
@@ -132,7 +154,6 @@ public class ProductImageController {
                 .status(HttpStatus.CREATED)
                 .body(ImageMapper.toDto(img));
     }
-
 
     // ============================================================
     // UTILIDAD: OBTENER EXTENSIÓN DE UNA URL

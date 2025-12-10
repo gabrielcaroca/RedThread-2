@@ -10,6 +10,7 @@ import com.redthread.catalog.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
@@ -18,32 +19,44 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class ProductService {
 
     private final ProductRepository productRepo;
     private final CategoryRepository categoryRepo;
     private final BrandRepository brandRepo;
 
+    // ============================================================
     // CREATE
-    public Product create(Long categoryId,
+    // ============================================================
+    @Transactional
+    public Product create(
+            Long categoryId,
             Long brandId,
             String name,
             String description,
             BigDecimal basePrice,
             boolean featured,
-            ProductGender gender) {
+            ProductGender gender
+    ) {
 
         if (basePrice == null || basePrice.signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Precio base inválido");
         }
 
         Category cat = categoryRepo.findById(categoryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Categoría no existe"
+                ));
 
         Brand brand = null;
         if (brandId != null) {
             brand = brandRepo.findById(brandId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Marca no existe"
+                    ));
         }
 
         Product p = Product.builder()
@@ -57,38 +70,76 @@ public class ProductService {
                 .gender(gender)
                 .createdAt(Instant.now())
                 .build();
-        
-        return productRepo.save(p);
+
+        Product saved = productRepo.save(p);
+
+        // Inicializar relaciones necesarias para evitar LazyInitializationException
+        touchRelations(saved);
+        return saved;
     }
 
+    // ============================================================
+    // GET BY ID (detalle de producto)
+    // ============================================================
+    public Product get(Long id) {
+        Product product = productRepo.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Producto no existe"
+                ));
+
+        // Inicializar relaciones antes de salir del método
+        touchRelations(product);
+        return product;
+    }
+
+    // ============================================================
+    // GET ALL
+    // ============================================================
     public List<Product> getAll() {
-        return productRepo.findAll();
+        List<Product> list = productRepo.findAll();
+        list.forEach(this::touchRelations);
+        return list;
     }
 
+    // ============================================================
     // UPDATE
-    public Product update(Long id,
+    // ============================================================
+    @Transactional
+    public Product update(
+            Long id,
             Long categoryId,
             Long brandId,
             String name,
             String description,
             BigDecimal basePrice,
             boolean featured,
-            ProductGender gender) {
+            ProductGender gender
+    ) {
 
         Product existing = productRepo.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no existe"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Producto no existe"
+                ));
 
         if (basePrice == null || basePrice.signum() < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Precio base inválido");
         }
 
         Category cat = categoryRepo.findById(categoryId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Categoría no existe"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Categoría no existe"
+                ));
 
         Brand brand = null;
         if (brandId != null) {
             brand = brandRepo.findById(brandId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Marca no existe"));
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND,
+                            "Marca no existe"
+                    ));
         }
 
         existing.setCategory(cat);
@@ -99,36 +150,58 @@ public class ProductService {
         existing.setFeatured(featured);
         existing.setGender(gender);
 
-        return productRepo.save(existing);
+        Product saved = productRepo.save(existing);
+
+        // Inicializar relaciones para JSON
+        touchRelations(saved);
+        return saved;
     }
 
-    // LIST FILTERS
+    // ============================================================
+    // LIST FILTERS (para home, tabs, etc.)
+    // ============================================================
     public List<Product> list(Long categoryId, ProductGender gender, Boolean featured) {
 
         boolean featOnly = featured != null && featured;
 
+        List<Product> result;
+
         if (categoryId != null && gender != null && featOnly) {
-            return productRepo.findByCategoryIdAndGenderAndFeaturedTrue(categoryId, gender);
-        }
-        if (categoryId != null && gender != null) {
-            return productRepo.findByCategoryIdAndGender(categoryId, gender);
-        }
-        if (categoryId != null && featOnly) {
-            return productRepo.findByCategoryIdAndFeaturedTrue(categoryId);
-        }
-        if (gender != null && featOnly) {
-            return productRepo.findByGenderAndFeaturedTrue(gender);
-        }
-        if (categoryId != null) {
-            return productRepo.findByCategoryId(categoryId);
-        }
-        if (gender != null) {
-            return productRepo.findByGender(gender);
-        }
-        if (featOnly) {
-            return productRepo.findByFeaturedTrue();
+            result = productRepo.findByCategoryIdAndGenderAndFeaturedTrue(categoryId, gender);
+        } else if (categoryId != null && gender != null) {
+            result = productRepo.findByCategoryIdAndGender(categoryId, gender);
+        } else if (categoryId != null && featOnly) {
+            result = productRepo.findByCategoryIdAndFeaturedTrue(categoryId);
+        } else if (gender != null && featOnly) {
+            result = productRepo.findByGenderAndFeaturedTrue(gender);
+        } else if (categoryId != null) {
+            result = productRepo.findByCategoryId(categoryId);
+        } else if (gender != null) {
+            result = productRepo.findByGender(gender);
+        } else if (featOnly) {
+            result = productRepo.findByFeaturedTrue();
+        } else {
+            result = productRepo.findAll();
         }
 
-        return productRepo.findAll();
+        // Inicializar relaciones de todos los productos antes de devolver
+        result.forEach(this::touchRelations);
+        return result;
+    }
+
+    // ============================================================
+    // Helper para inicializar relaciones LAZY
+    // ============================================================
+    private void touchRelations(Product p) {
+        // Forzamos la carga de category y brand dentro de la transacción
+        if (p.getCategory() != null) {
+            p.getCategory().getId();
+            p.getCategory().getName();
+        }
+        if (p.getBrand() != null) {
+            p.getBrand().getId();
+            p.getBrand().getName();
+        }
+        // Si en el futuro quieres inicializar variantes, etc., también se hace aquí.
     }
 }
