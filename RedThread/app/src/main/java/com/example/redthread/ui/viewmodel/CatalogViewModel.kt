@@ -18,9 +18,6 @@ class CatalogViewModel(
     private val repo: CatalogRepository
 ) : AndroidViewModel(app) {
 
-    // ============================
-    // ESTADOS
-    // ============================
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading
 
@@ -36,17 +33,17 @@ class CatalogViewModel(
     private val _brands = MutableStateFlow<List<BrandDto>>(emptyList())
     val brands: StateFlow<List<BrandDto>> = _brands
 
-    private val _product = MutableStateFlow<ProductDto?>(null)
-    val product: StateFlow<ProductDto?> = _product
-
-    // ⭐ Lista completa de productos
     private val _products = MutableStateFlow<List<ProductDto>>(emptyList())
     val products: StateFlow<List<ProductDto>> = _products
 
+    // PRODUCTO ACTUAL (cargar para editar)
+    private val _currentProduct = MutableStateFlow<ProductDto?>(null)
+    val currentProduct: StateFlow<ProductDto?> = _currentProduct
 
-    // ============================
+
+    // ===========================
     // LISTAR PRODUCTOS
-    // ============================
+    // ===========================
     fun loadProducts() = viewModelScope.launch {
         safeCall(
             action = { repo.getProducts() },
@@ -54,9 +51,9 @@ class CatalogViewModel(
         )
     }
 
-    // ============================
-    // CATEGORÍAS / MARCAS / PRODUCTO
-    // ============================
+    // ===========================
+    // CATEGORÍAS Y MARCAS
+    // ===========================
     fun loadCategories() = viewModelScope.launch {
         safeCall(
             action = { repo.getCategories() },
@@ -71,30 +68,58 @@ class CatalogViewModel(
         )
     }
 
-    fun loadProduct(id: Int) = viewModelScope.launch {
-        safeCall(
-            action = { repo.getProduct(id) },
-            onSuccess = { _product.value = it }
-        )
+    // ===========================
+    // CARGAR PRODUCTO PARA EDITAR
+    // ===========================
+    fun loadProduct(id: Int) {
+        viewModelScope.launch {
+            try {
+                _loading.value = true
+                val p = repo.getProduct(id)
+                _currentProduct.value = p
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _loading.value = false
+            }
+        }
     }
 
-    // ============================
+    // ===========================
+    // ACTUALIZAR PRODUCTO
+    // ===========================
+    fun updateProduct(
+        id: Int,
+        req: CreateProductRequest,
+        onDone: (Int) -> Unit
+    ) {
+        viewModelScope.launch {
+            try {
+                _loading.value = true
+                val updated = repo.updateProduct(id, req)
+                onDone(updated.id)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _loading.value = false
+            }
+        }
+    }
+
+    // ===========================
     // CREAR PRODUCTO
-    // ============================
+    // ===========================
     fun createProduct(req: CreateProductRequest, onCreated: (Int) -> Unit) =
         viewModelScope.launch {
             safeCall(
                 action = { repo.createProduct(req) },
-                onSuccess = {
-                    _product.value = it
-                    onCreated(it.id)
-                }
+                onSuccess = { onCreated(it.id) }
             )
         }
 
-    // ============================
+    // ===========================
     // CREAR VARIANTE
-    // ============================
+    // ===========================
     fun createVariant(req: CreateVariantRequest, onDone: () -> Unit) =
         viewModelScope.launch {
             safeCall(
@@ -103,9 +128,9 @@ class CatalogViewModel(
             )
         }
 
-    // ============================
-    // SUBIR IMAGEN (MULTIPART)
-    // ============================
+    // ===========================
+    // SUBIR IMAGEN DESDE ARCHIVO
+    // ===========================
     fun uploadImage(productId: Int, file: MultipartBody.Part, onDone: () -> Unit) =
         viewModelScope.launch {
             safeCall(
@@ -114,9 +139,9 @@ class CatalogViewModel(
             )
         }
 
-    // ============================
+    // ===========================
     // SUBIR IMAGEN DESDE URL
-    // ============================
+    // ===========================
     fun uploadImageFromUrl(productId: Int, url: String, onDone: () -> Unit) =
         viewModelScope.launch {
             safeCall(
@@ -125,9 +150,9 @@ class CatalogViewModel(
             )
         }
 
-    // ============================
-    // SUBIR IMAGEN DESDE ARCHIVO LOCAL
-    // ============================
+    // ===========================
+    // SUBIR IMAGEN DESDE URI
+    // ===========================
     fun uploadImageFile(productId: Int, uri: Uri, onDone: () -> Unit) {
         viewModelScope.launch {
             val context = getApplication<Application>()
@@ -157,10 +182,9 @@ class CatalogViewModel(
         }
     }
 
-
-    // ============================
-    // MANEJADOR GENÉRICO DE ERRORES
-    // ============================
+    // ===========================
+    // HANDLER GENÉRICO
+    // ===========================
     private suspend fun <T> safeCall(
         action: suspend () -> T,
         onSuccess: (T) -> Unit
@@ -178,14 +202,11 @@ class CatalogViewModel(
             val code = e.code()
             val body = e.response()?.errorBody()?.string()
             _error.value = "HTTP $code: $body"
-            android.util.Log.e("CatalogVM", "HTTP ERROR: $code\n$body")
 
         } catch (e: Exception) {
             _error.value = e.message ?: "Error desconocido"
-            android.util.Log.e("CatalogVM", "ERROR:", e)
         } finally {
             _loading.value = false
         }
     }
-
 }

@@ -210,8 +210,12 @@ fun AppNavGraph(
                     catalogVm = catalogVm,
                     onCreateProduct = {
                         navController.navigate(Route.CrearProducto.path)
+                    },
+                    onEditProduct = { productId ->
+                        navController.navigate("editar-producto/$productId")
                     }
                 )
+
             }
 
             // DESPACHADOR
@@ -303,6 +307,32 @@ fun AppNavGraph(
                     }
                 )
             }
+
+            // EDITAR PRODUCTO
+            composable(
+                "editar-producto/{productId}",
+                arguments = listOf(navArgument("productId") { type = NavType.IntType })
+            ) { backStack ->
+
+                val id = backStack.arguments?.getInt("productId") ?: 0
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                // LO ÚNICO IMPORTANTE: mandar productId
+                CreateProductScreen(
+                    vm = vm,
+                    productId = id,   // ← ESTO ES ESENCIAL
+                    onNext = { variantId ->
+                        // Aquí no importa mucho ahora
+                        navController.navigate("admin/variant/edit/$id/$variantId")
+                    }
+                )
+            }
+
+
 
             // CREAR VARIANTE
             composable(
