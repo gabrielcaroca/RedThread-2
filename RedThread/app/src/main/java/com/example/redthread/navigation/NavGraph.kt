@@ -321,16 +321,17 @@ fun AppNavGraph(
                 val factory = CatalogVmFactory(app, repo)
                 val vm: CatalogViewModel = viewModel(factory = factory)
 
-                // LO ÚNICO IMPORTANTE: mandar productId
                 CreateProductScreen(
                     vm = vm,
-                    productId = id,   // ← ESTO ES ESENCIAL
-                    onNext = { variantId ->
-                        // Aquí no importa mucho ahora
-                        navController.navigate("admin/variant/edit/$id/$variantId")
+                    productId = id,
+                    onNext = {
+                        // ← ESTO ES LO QUE QUERÍAS
+                        navController.popBackStack()
                     }
                 )
             }
+
+
 
 
 
