@@ -1,11 +1,11 @@
 package com.redthread.order.integrations;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
-import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -29,45 +29,90 @@ public class CatalogClient {
 
   public VariantInfo findVariantById(Long variantId) {
     String token = currentToken();
+
     try {
-      Map<String, Object> m = catalogWebClient.get()
-          .uri("/inventory/by-variant/{id}", variantId)
+      // ==========================
+      // 1) Obtener la variante
+      // ==========================
+      Map<String, Object> variant = catalogWebClient.get()
+          .uri("/variants/{id}", variantId)
           .headers(h -> { if (token != null) h.setBearerAuth(token); })
           .accept(MediaType.APPLICATION_JSON)
           .retrieve()
           .bodyToMono(Map.class)
           .block();
 
-      if (m == null) return null;
+      if (variant == null) {
+        return null;
+      }
 
-      Map<String, Object> variant = (Map<String, Object>) m.get("variant");
-      if (variant == null) return null;
-
+      // ==========================
+      // 2) Resolver precio
+      // ==========================
       BigDecimal price = BigDecimal.ZERO;
 
-      if (variant.containsKey("priceOverride") && variant.get("priceOverride") != null) {
-        price = new BigDecimal(String.valueOf(variant.get("priceOverride")));
-      } else if (variant.containsKey("product")) {
-        Map<String, Object> product = (Map<String, Object>) variant.get("product");
-        if (product != null && product.get("basePrice") != null) {
-          price = new BigDecimal(String.valueOf(product.get("basePrice")));
+      Object overrideObj = variant.get("priceOverride");
+      if (overrideObj != null) {
+        price = new BigDecimal(String.valueOf(overrideObj));
+      } else {
+        // Fallback al basePrice del producto
+        Object productIdObj = variant.get("productId");
+        if (productIdObj != null) {
+          Long productId = Long.parseLong(String.valueOf(productIdObj));
+
+          Map<String, Object> product = catalogWebClient.get()
+              .uri("/products/{id}", productId)
+              .headers(h -> { if (token != null) h.setBearerAuth(token); })
+              .accept(MediaType.APPLICATION_JSON)
+              .retrieve()
+              .bodyToMono(Map.class)
+              .block();
+
+          if (product != null && product.get("basePrice") != null) {
+            price = new BigDecimal(String.valueOf(product.get("basePrice")));
+          }
         }
       }
 
+      // ==========================
+      // 3) Stock desde inventario
+      // ==========================
       Integer stock = 0;
-      if (m.get("stockAvailable") != null) {
-        stock = Integer.parseInt(String.valueOf(m.get("stockAvailable")));
+
+      Map<String, Object> inventory = catalogWebClient.get()
+          .uri("/inventory/by-variant/{id}", variantId)
+          .headers(h -> { if (token != null) h.setBearerAuth(token); })
+          .accept(MediaType.APPLICATION_JSON)
+          .retrieve()
+          .bodyToMono(Map.class)
+          .onErrorResume(ex -> Mono.empty())
+          .block();
+
+      if (inventory != null) {
+        int available = 0;
+        int reserved = 0;
+
+        Object stockAvailable = inventory.get("stockAvailable");
+        Object stockReserved = inventory.get("stockReserved");
+
+        if (stockAvailable != null) {
+          available = Integer.parseInt(String.valueOf(stockAvailable));
+        }
+        if (stockReserved != null) {
+          reserved = Integer.parseInt(String.valueOf(stockReserved));
+        }
+
+        stock = Math.max(available - reserved, 0);
       }
 
       return new VariantInfo(variantId, price, stock);
 
     } catch (Exception ex) {
-      System.err.println(" Error al obtener variant desde Catalog-Service: " + ex.getMessage());
+      System.err.println("Error al obtener variant desde Catalog-Service: " + ex.getMessage());
       return null;
     }
   }
 
-  
   public void adjustStock(Long variantId, int delta) {
     String token = currentToken();
     catalogWebClient.post()

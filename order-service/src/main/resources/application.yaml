@@ -1,5 +1,6 @@
 server:
   port: 8083
+
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/rt_orders
@@ -11,6 +12,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        type:
+          preferred_enum_type: postgres_enum   # usar enums nativos de Postgres
     open-in-view: false
   flyway:
     enabled: true
@@ -26,7 +29,6 @@ logging:
   level:
     org.springframework.security: DEBUG
     org.springframework.security.oauth2: DEBUG
-
 
 app:
   security:

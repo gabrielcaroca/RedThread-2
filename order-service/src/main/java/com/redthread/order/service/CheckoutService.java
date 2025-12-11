@@ -28,11 +28,16 @@ public class CheckoutService {
   public Order checkout(String userId, CheckoutReq req) {
     Cart cart = cartRepo.findByUserId(userId)
         .orElseThrow(() -> new IllegalArgumentException("Carrito no existe"));
+
     List<CartItem> items = itemRepo.findByCartId(cart.getId());
-    if (items.isEmpty())
+    if (items.isEmpty()) {
       throw new IllegalStateException("Carrito vacío");
+    }
+
     Address address = addressRepo.findByIdAndUserId(req.addressId(), userId)
-        .orElseThrow(() -> new IllegalArgumentException("Address inválida"));
+        .orElseThrow(() -> new IllegalArgumentException("Dirección inválida"));
+
+    // Crear orden base en estado CREATED
     Order order = Order.builder()
         .userId(userId)
         .address(address)
@@ -58,6 +63,17 @@ public class CheckoutService {
 
       BigDecimal line = unit.multiply(BigDecimal.valueOf(it.getQuantity()));
       total = total.add(line);
+
+      // ============================
+      // Descontar stock en Catalog
+      // ============================
+      try {
+        // delta negativo -> reduce stock disponible
+        catalog.adjustStock(it.getVariantId(), -it.getQuantity());
+      } catch (Exception ex) {
+        throw new IllegalStateException(
+            "No se pudo ajustar el stock para la variante " + it.getVariantId(), ex);
+      }
 
       orderItemRepo.save(OrderItem.builder()
           .order(order)

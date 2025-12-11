@@ -53,6 +53,7 @@ class CartViewModel(
 
     private suspend fun reloadFromBackend() {
         try {
+            Log.d("CartViewModel", "reloadFromBackend() -> GET /cart")
             val cart = ApiClient.orders.getCart()
 
             val enriched = cart.items.map { ci ->
@@ -61,7 +62,7 @@ class CartViewModel(
 
                 val unit = ci.unitPrice
                 CartItem(
-                    itemId = ci.itemId,               // usa itemId del DTO
+                    itemId = ci.itemId,                 // ✅ usa itemId del DTO
                     variantId = ci.variantId,
                     productId = product.id,
                     nombre = product.name,
@@ -78,7 +79,7 @@ class CartViewModel(
             recomputeCount(enriched)
         } catch (e: Exception) {
             Log.e("CartViewModel", "Error recargando carrito desde backend", e)
-            // si falla, dejamos el carrito local tal cual
+            // dejamos el carrito local tal cual
         }
     }
 
@@ -86,22 +87,19 @@ class CartViewModel(
     // API pública
     // ==========================
 
-    /**
-     * Cargar carrito desde backend si hay token.
-     */
     fun refreshFromBackendIfLogged() {
         viewModelScope.launch {
-            if (!isLogged()) return@launch
+            if (!isLogged()) {
+                Log.d("CartViewModel", "refreshFromBackendIfLogged(): no hay token, no sincroniza")
+                return@launch
+            }
             reloadFromBackend()
         }
     }
 
-    /**
-     * Agregar un producto al carrito.
-     */
     fun addToCart(draft: CartItem) {
         viewModelScope.launch {
-            // 1) Actualizar carrito LOCAL respetando stock
+            // 1) Actualizar carrito local respetando stock
             _items.update { current ->
                 val idx = current.indexOfFirst {
                     it.productId == draft.productId &&
@@ -126,14 +124,12 @@ class CartViewModel(
             }
             recomputeCount(_items.value)
 
-            // 2) Si no está logeado, solo carrito local
             if (!isLogged()) return@launch
 
-            // 3) Si está logeado: sincronizar con backend
             try {
                 val variantId = draft.variantId
                 if (variantId == null) {
-                    Log.w("CartViewModel", "No hay variantId en draft, no se puede sincronizar con backend")
+                    Log.w("CartViewModel", "addToCart(): draft sin variantId, no sincroniza backend")
                     return@launch
                 }
 
@@ -152,9 +148,6 @@ class CartViewModel(
         }
     }
 
-    /**
-     * Cambiar cantidad de un item.
-     */
     fun updateQty(item: CartItem, newQty: Int) {
         viewModelScope.launch {
             val safeQty = newQty.coerceAtLeast(1)
@@ -177,9 +170,6 @@ class CartViewModel(
         }
     }
 
-    /**
-     * Eliminar un producto del carrito.
-     */
     fun removeItem(item: CartItem) {
         viewModelScope.launch {
             _items.update { list -> list.filterNot { it == item } }
@@ -196,9 +186,6 @@ class CartViewModel(
         }
     }
 
-    /**
-     * Vaciar carrito SOLO local (se usa al hacer logout).
-     */
     fun clearLocal() {
         _items.value = emptyList()
         _count.value = 0
@@ -206,15 +193,13 @@ class CartViewModel(
 
     /**
      * Vaciar carrito local + backend.
-     * Esto es lo que probablemente llama CarroScreen con cartVm.clear().
+     * Esto es lo que llama CarroScreen con vm.clear()
      */
     fun clear() {
         viewModelScope.launch {
-            // limpiar local
             _items.value = emptyList()
             _count.value = 0
 
-            // si no hay login, no intentamos backend
             if (!isLogged()) return@launch
 
             try {

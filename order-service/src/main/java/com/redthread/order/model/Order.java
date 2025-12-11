@@ -2,9 +2,14 @@ package com.redthread.order.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+
+// Importes para mapear enum nativo de Postgres
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Getter
 @Setter
@@ -14,6 +19,7 @@ import java.util.List;
 @Entity
 @Table(name = "orders")
 public class Order {
+
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
   private Long id;
@@ -25,8 +31,10 @@ public class Order {
   @JoinColumn(name = "address_id")
   private Address address;
 
+  // status ↔ enum Postgres order_status
   @Enumerated(EnumType.STRING)
-  @Column(nullable = false)
+  @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+  @Column(nullable = false, columnDefinition = "order_status")
   private OrderStatus status;
 
   @Column(nullable = false, precision = 14, scale = 2)

@@ -3,7 +3,13 @@ package com.example.redthread.ui.screen
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -12,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import com.example.redthread.data.remote.ApiClient
@@ -47,6 +54,11 @@ fun DetalleProductoScreen(
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    val scrollState = rememberScrollState()
+
+    // Estado actual del carrito (para saber cuánto hay ya añadido)
+    val cartItems by cartVm.items.collectAsStateWithLifecycle()
+
     // ===== CARGA BACKEND =====
     fun reload() {
         scope.launch {
@@ -80,12 +92,47 @@ fun DetalleProductoScreen(
     val priceText = formatCLP(selectedPrice.toInt())
     val stockDisponible = selectedVariant?.stock ?: 0
 
+    // Cantidad YA en el carrito para esta variante
+    val qtyEnCarritoParaVariante = remember(cartItems, selectedVariant?.id) {
+        val vid = selectedVariant?.id
+        if (vid == null) 0
+        else cartItems.filter { it.variantId == vid }.sumOf { it.cantidad }
+    }
+
+    // Stock realmente disponible considerando lo que ya está en el carrito
+    val stockRestante = (stockDisponible - qtyEnCarritoParaVariante).coerceAtLeast(0)
+
     fun agregarAlCarrito() {
         val p = product ?: return
         val v = selectedVariant ?: return
 
         if (stockDisponible <= 0) {
             Toast.makeText(ctx, "Sin stock disponible", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Recalcular por si cambió algo justo antes del click
+        val qtyEnCarrito = cartItems
+            .filter { it.variantId == v.id }
+            .sumOf { it.cantidad }
+
+        val restante = (stockDisponible - qtyEnCarrito).coerceAtLeast(0)
+
+        if (restante <= 0) {
+            Toast.makeText(
+                ctx,
+                "Ya tienes el máximo stock en el carrito para esta talla/color.",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        if (quantity > restante) {
+            Toast.makeText(
+                ctx,
+                "Solo puedes agregar $restante unidades más de este producto.",
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
 
@@ -99,7 +146,7 @@ fun DetalleProductoScreen(
             precio = priceText,
             cantidad = quantity,
             unitPrice = selectedPrice,
-            stockAvailable = stockDisponible          // 👈 ahora pasamos el stock
+            stockAvailable = stockDisponible
         )
 
         cartVm.addToCart(item)
@@ -107,27 +154,45 @@ fun DetalleProductoScreen(
         onAddedToCart()
     }
 
+    // ==========================
+    // LAYOUT
+    // ==========================
+    if (loading) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Black),
+            contentAlignment = Alignment.Center
+        ) {
+            CircularProgressIndicator(color = Color.White)
+        }
+        return
+    }
+
+    if (error != null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Black),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(error!!, color = Color.Red)
+                Spacer(Modifier.height(12.dp))
+                Button(onClick = { reload() }) { Text("Reintentar") }
+            }
+        }
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Black)
+            .verticalScroll(scrollState)
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // LOADING
-        if (loading) {
-            CircularProgressIndicator(color = Color.White)
-            return@Column
-        }
-
-        // ERROR
-        if (error != null) {
-            Text(error!!, color = Color.Red)
-            Spacer(Modifier.height(12.dp))
-            Button(onClick = { reload() }) { Text("Reintentar") }
-            return@Column
-        }
-
         // ===== IMAGEN =====
         val mainImage = images.firstOrNull { it.primary == true } ?: images.firstOrNull()
         val imageUrl = absImage(mainImage?.publicUrl)
@@ -151,7 +216,7 @@ fun DetalleProductoScreen(
             fontWeight = FontWeight.Bold
         )
 
-        // ===== CATEGORA =====
+        // ===== CATEGORÍA =====
         if (displayCategory.isNotBlank()) {
             Text(displayCategory, color = TextSecondary, fontSize = 14.sp)
         }
@@ -191,7 +256,10 @@ fun DetalleProductoScreen(
                 val selected = v == selectedVariant
 
                 OutlinedButton(
-                    onClick = { selectedVariant = v; quantity = 1 },
+                    onClick = {
+                        selectedVariant = v
+                        quantity = 1
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 4.dp),
@@ -226,31 +294,47 @@ fun DetalleProductoScreen(
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
 
+            // Solo puedes aumentar hasta el stock restante (considerando carrito)
+            val puedeAumentar = stockRestante > 0 && quantity < stockRestante
+
             OutlinedButton(
                 onClick = {
-                    if (quantity < stockDisponible) quantity++
-                    else Toast.makeText(
-                        ctx,
-                        "Stock máximo alcanzado",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    if (quantity < stockRestante) {
+                        quantity++
+                    } else {
+                        Toast.makeText(
+                            ctx,
+                            "Stock máximo alcanzado para esta talla/color (considerando el carrito).",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 },
-                enabled = stockDisponible > 0
+                enabled = puedeAumentar
             ) { Text("+") }
         }
 
         Spacer(Modifier.height(24.dp))
 
         // ===== BOTÓN AGREGAR =====
+        val botonHabilitado = stockDisponible > 0 && stockRestante > 0
+
         Button(
             onClick = { agregarAlCarrito() },
             modifier = Modifier
                 .fillMaxWidth()
                 .height(50.dp),
-            enabled = stockDisponible > 0
+            enabled = botonHabilitado,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFFE53935),
+                contentColor = Color.White,
+                disabledContainerColor = Color(0xFFE53935).copy(alpha = 0.4f),
+                disabledContentColor = Color.White.copy(alpha = 0.7f)
+            )
         ) {
             Text("Agregar al carrito")
         }
+
+        Spacer(Modifier.height(16.dp))
     }
 }
 

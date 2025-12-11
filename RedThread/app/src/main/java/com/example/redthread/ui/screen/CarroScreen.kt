@@ -37,8 +37,18 @@ fun CarroScreen(
 ) {
     val items by vm.items.collectAsState()
 
-    val total = items.sumOf { (it.unitPrice ?: 0.0) * it.cantidad }.roundToInt()
-    val totalText = formatCLP(total)
+    // Total bruto (con IVA) usando unitPrice
+    val totalBruto = items.sumOf { (it.unitPrice ?: 0.0) * it.cantidad }.roundToInt()
+
+    // Subtotal neto (sin IVA) calculado desde el precio que ya incluye IVA
+    val totalNeto = items.sumOf { item ->
+        val unitBrutoInt = parseInt(item.precio)
+        val unitNetoInt = (unitBrutoInt / 1.19).toInt()  // aprox sin IVA
+        unitNetoInt * item.cantidad
+    }
+
+    val totalTextBruto = formatCLP(totalBruto)
+    val totalTextNeto = formatCLP(totalNeto)
 
     Column(
         modifier = Modifier
@@ -87,23 +97,51 @@ fun CarroScreen(
         Spacer(Modifier.height(16.dp))
 
         // ========== RESUMEN / TOTAL ==========
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF111111))
+                .padding(12.dp)
         ) {
-            Text(
-                text = "Total",
-                color = TextPrimary,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(
-                text = totalText,
-                color = Color.White,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Subtotal (sin IVA)",
+                    color = TextSecondary,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    text = totalTextNeto,
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Total (con IVA)",
+                    color = TextPrimary,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = totalTextBruto,
+                    color = Color.White,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -146,7 +184,13 @@ private fun CartItemRow(
 ) {
     val ctx = LocalContext.current
     val unit = item.unitPrice ?: 0.0
-    val subtotal = (unit * item.cantidad).roundToInt()
+    val subtotalBruto = (unit * item.cantidad).roundToInt()
+
+    // Calcular subtotal sin IVA por producto
+    val unitBrutoInt = parseInt(item.precio)
+    val unitNetoInt = (unitBrutoInt / 1.19).toInt()
+    val subtotalNeto = unitNetoInt * item.cantidad
+
     val maxStock = item.stockAvailable ?: Int.MAX_VALUE
 
     Column(
@@ -181,7 +225,7 @@ private fun CartItemRow(
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Precio unitario: ${item.precio}",
+                    text = "Precio unitario: ${item.precio}", // con IVA
                     color = TextSecondary,
                     fontSize = 13.sp
                 )
@@ -242,9 +286,9 @@ private fun CartItemRow(
                 }
             }
 
-            // Subtotal
+            // Subtotal sin IVA por producto
             Text(
-                text = "Subtotal: ${formatCLP(subtotal)}",
+                text = "Subtotal (sin IVA): ${formatCLP(subtotalNeto)}",
                 color = TextPrimary,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium
@@ -257,3 +301,6 @@ private fun formatCLP(value: Int): String {
     val s = String.format(Locale.US, "%,d", value)
     return "$" + s.replace(',', '.')
 }
+
+private fun parseInt(raw: String): Int =
+    raw.filter { it.isDigit() }.toIntOrNull() ?: 0
