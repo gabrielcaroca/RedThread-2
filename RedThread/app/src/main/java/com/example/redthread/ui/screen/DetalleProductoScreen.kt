@@ -34,7 +34,7 @@ fun DetalleProductoScreen(
     categoria: String,
     cartVm: CartViewModel,
     onAddedToCart: () -> Unit = {},
-    nav: NavHostController
+    navController: NavHostController
 ) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -98,7 +98,8 @@ fun DetalleProductoScreen(
             color = v.color,
             precio = priceText,
             cantidad = quantity,
-            unitPrice = selectedPrice
+            unitPrice = selectedPrice,
+            stockAvailable = stockDisponible          // 👈 ahora pasamos el stock
         )
 
         cartVm.addToCart(item)
@@ -127,7 +128,7 @@ fun DetalleProductoScreen(
             return@Column
         }
 
-        // ===== IMAGEN (usando lista de imágenes del backend) =====
+        // ===== IMAGEN =====
         val mainImage = images.firstOrNull { it.primary == true } ?: images.firstOrNull()
         val imageUrl = absImage(mainImage?.publicUrl)
 
@@ -150,7 +151,7 @@ fun DetalleProductoScreen(
             fontWeight = FontWeight.Bold
         )
 
-        // ===== CATEGORIA =====
+        // ===== CATEGORA =====
         if (displayCategory.isNotBlank()) {
             Text(displayCategory, color = TextSecondary, fontSize = 14.sp)
         }

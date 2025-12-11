@@ -23,6 +23,9 @@ public class ProductController {
 
     private final ProductService service;
 
+    // ============================================================
+    // CREAR
+    // ============================================================
     @PostMapping
     @Operation(summary = "Crear producto")
     @ApiResponses({
@@ -45,12 +48,18 @@ public class ProductController {
                 .body(created);
     }
 
+    // ============================================================
+    // LISTAR TODOS SIN FILTROS
+    // ============================================================
     @GetMapping("/all")
     @Operation(summary = "Listar todos los productos sin filtros")
     public List<Product> getAll() {
         return service.getAll();
     }
 
+    // ============================================================
+    // ACTUALIZAR
+    // ============================================================
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar producto")
     public Product update(
@@ -69,6 +78,9 @@ public class ProductController {
         );
     }
 
+    // ============================================================
+    // LISTAR CON FILTROS (home, tabs, etc.)
+    // ============================================================
     @GetMapping
     @Operation(
             summary = "Listar productos",
@@ -91,10 +103,10 @@ public class ProductController {
     }
 
     // ============================================================
-    // GET BY ID (usado por la app para el detalle de producto)
+    // GET BY ID (detalle para la app)
     // ============================================================
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener producto por ID")
+    @Operation(summary = "Obtener producto por ID (detalle)")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Producto encontrado"),
             @ApiResponse(responseCode = "404", description = "Producto no existe")

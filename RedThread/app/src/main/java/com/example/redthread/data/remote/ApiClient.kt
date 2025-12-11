@@ -17,7 +17,9 @@ object ApiClient {
         session = sessionPrefs
     }
 
-    // Interceptor JWT: agrega Bearer automáticamente si hay token
+    // ==========================
+    // Interceptor JWT
+    // ==========================
     private val authInterceptor = Interceptor { chain ->
         val token = runBlocking {
             if (::session.isInitialized) session.tokenFlow.firstOrNull() ?: "" else ""
@@ -34,38 +36,51 @@ object ApiClient {
         chain.proceed(req)
     }
 
-    private val client: OkHttpClient by lazy {
+    // Cliente CON auth (para endpoints protegidos)
+    private val authedClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .build()
     }
 
-    private fun retrofit(baseUrl: String): Retrofit =
+    // Cliente SIN auth (para catálogo público)
+    private val plainClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .build()
+    }
+
+    private fun retrofit(baseUrl: String, client: OkHttpClient): Retrofit =
         Retrofit.Builder()
             .baseUrl(baseUrl)
             .client(client)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
+    // ==========================
     // Microservicios
+    // ==========================
+
+    // Auth / identity -> usa token
     val identity: AuthApi by lazy {
-        retrofit(BaseUrls.IDENTITY).create(AuthApi::class.java)
+        retrofit(BaseUrls.IDENTITY, authedClient).create(AuthApi::class.java)
     }
 
+    // Catalog -> SIN token (público: productos, variantes, imágenes)
     val catalog: CatalogApi by lazy {
-        retrofit(BaseUrls.CATALOG).create(CatalogApi::class.java)
+        retrofit(BaseUrls.CATALOG, plainClient).create(CatalogApi::class.java)
     }
 
+    // Orders -> requiere token
     val orders: OrdersApi by lazy {
-        retrofit(BaseUrls.ORDERS).create(OrdersApi::class.java)
+        retrofit(BaseUrls.ORDERS, authedClient).create(OrdersApi::class.java)
     }
 
+    // Delivery -> requiere token
     val delivery: DeliveryApi by lazy {
-        retrofit(BaseUrls.DELIVERY).create(DeliveryApi::class.java)
+        retrofit(BaseUrls.DELIVERY, authedClient).create(DeliveryApi::class.java)
     }
 
-    // AddressApi vive en order-service (8083)
     val address: AddressApi by lazy {
-        retrofit(BaseUrls.ORDERS).create(AddressApi::class.java)
+        retrofit(BaseUrls.ORDERS, authedClient).create(AddressApi::class.java)
     }
 }

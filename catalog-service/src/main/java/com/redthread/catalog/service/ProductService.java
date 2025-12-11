@@ -82,7 +82,8 @@ public class ProductService {
     // GET BY ID (detalle de producto)
     // ============================================================
     public Product get(Long id) {
-        Product product = productRepo.findById(id)
+        // Usamos el método con EntityGraph que trae category y brand
+        Product product = productRepo.findDetailById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Producto no existe"
@@ -193,7 +194,6 @@ public class ProductService {
     // Helper para inicializar relaciones LAZY
     // ============================================================
     private void touchRelations(Product p) {
-        // Forzamos la carga de category y brand dentro de la transacción
         if (p.getCategory() != null) {
             p.getCategory().getId();
             p.getCategory().getName();
@@ -202,6 +202,5 @@ public class ProductService {
             p.getBrand().getId();
             p.getBrand().getName();
         }
-        // Si en el futuro quieres inicializar variantes, etc., también se hace aquí.
     }
 }

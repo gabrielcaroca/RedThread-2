@@ -1,12 +1,15 @@
 package com.example.redthread.data.repository
 
-import com.example.redthread.data.remote.*
+import com.example.redthread.data.remote.AddItemReq
+import com.example.redthread.data.remote.OrdersApi
+import com.example.redthread.data.remote.UpdateQtyReq
 import com.example.redthread.data.remote.dto.ProductDto
 import com.example.redthread.data.remote.dto.VariantDto
+import com.example.redthread.data.remote.CatalogApi
 
 class CartRepository(
     private val ordersApi: OrdersApi,
-    private val catalogApi: com.example.redthread.data.remote.CatalogApi
+    private val catalogApi: CatalogApi
 ) {
 
     suspend fun getCartEnriched(): List<CartUiItem> {
@@ -17,7 +20,7 @@ class CartRepository(
             val product: ProductDto = catalogApi.getProduct(variant.productId.toInt())
 
             CartUiItem(
-                itemId = it.id,
+                itemId = it.itemId,          // ✅ ahora usa itemId
                 variantId = it.variantId,
                 productId = product.id,
                 nombre = product.name,

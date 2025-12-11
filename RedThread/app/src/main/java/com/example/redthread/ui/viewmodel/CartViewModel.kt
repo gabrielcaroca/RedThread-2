@@ -1,6 +1,7 @@
 package com.example.redthread.ui.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.redthread.data.local.SessionPrefs
@@ -14,27 +15,34 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.Locale
 
-class CartViewModel(app: Application) : AndroidViewModel(app) {
+class CartViewModel(
+    app: Application
+) : AndroidViewModel(app) {
 
     data class CartItem(
-        val itemId: Long? = null,      // id del item en backend
-        val variantId: Long? = null,   // id variante real
+        val itemId: Long? = null,
+        val variantId: Long? = null,
         val productId: Int,
         val nombre: String,
         val talla: String,
         val color: String,
         val precio: String,
         val cantidad: Int = 1,
-        val unitPrice: Double? = null // precio unitario real backend
+        val unitPrice: Double? = null,
+        val stockAvailable: Int? = null
     )
 
-    private val session = SessionPrefs(app)
+    private val session = SessionPrefs(app.applicationContext)
 
     private val _items = MutableStateFlow<List<CartItem>>(emptyList())
     val items: StateFlow<List<CartItem>> = _items
 
     private val _count = MutableStateFlow(0)
     val count: StateFlow<Int> = _count
+
+    // ==========================
+    // Helpers internos
+    // ==========================
 
     private suspend fun isLogged(): Boolean =
         session.tokenFlow.firstOrNull()?.isNotBlank() == true
@@ -43,136 +51,183 @@ class CartViewModel(app: Application) : AndroidViewModel(app) {
         _count.value = list.sumOf { it.cantidad }
     }
 
-    // ========= CARGA REMOTA =========
-    suspend fun refreshFromBackendIfLogged() {
-        if (!isLogged()) return
-
+    private suspend fun reloadFromBackend() {
         try {
             val cart = ApiClient.orders.getCart()
+
             val enriched = cart.items.map { ci ->
                 val variant = ApiClient.catalog.getVariant(ci.variantId)
                 val product = ApiClient.catalog.getProduct(variant.productId.toInt())
 
+                val unit = ci.unitPrice
                 CartItem(
-                    itemId = ci.id,
+                    itemId = ci.itemId,               // usa itemId del DTO
                     variantId = ci.variantId,
                     productId = product.id,
                     nombre = product.name,
                     talla = variant.sizeValue,
                     color = variant.color,
-                    unitPrice = ci.unitPrice,
-                    precio = formatCLP(ci.unitPrice.toInt()),
-                    cantidad = ci.quantity
+                    precio = formatCLP(unit.toInt()),
+                    cantidad = ci.quantity,
+                    unitPrice = unit,
+                    stockAvailable = variant.stock
                 )
             }
 
             _items.value = enriched
             recomputeCount(enriched)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("CartViewModel", "Error recargando carrito desde backend", e)
+            // si falla, dejamos el carrito local tal cual
         }
     }
 
-    // ========= AGREGAR =========
+    // ==========================
+    // API pública
+    // ==========================
+
+    /**
+     * Cargar carrito desde backend si hay token.
+     */
+    fun refreshFromBackendIfLogged() {
+        viewModelScope.launch {
+            if (!isLogged()) return@launch
+            reloadFromBackend()
+        }
+    }
+
+    /**
+     * Agregar un producto al carrito.
+     */
     fun addToCart(draft: CartItem) {
         viewModelScope.launch {
-            if (!isLogged()) {
-                // invitado -> local memoria
-                _items.update { list ->
-                    val idx = list.indexOfFirst {
-                        it.productId == draft.productId &&
-                                it.talla.equals(draft.talla, true) &&
-                                it.color.equals(draft.color, true)
-                    }
-                    if (idx >= 0) {
-                        val copy = list.toMutableList()
-                        val old = copy[idx]
-                        copy[idx] = old.copy(cantidad = old.cantidad + draft.cantidad)
-                        copy
-                    } else list + draft
+            // 1) Actualizar carrito LOCAL respetando stock
+            _items.update { current ->
+                val idx = current.indexOfFirst {
+                    it.productId == draft.productId &&
+                            it.talla.equals(draft.talla, true) &&
+                            it.color.equals(draft.color, true)
                 }
-                recomputeCount(_items.value)
-                return@launch
-            }
+                if (idx >= 0) {
+                    val copy = current.toMutableList()
+                    val old = copy[idx]
 
+                    val maxStock = old.stockAvailable ?: draft.stockAvailable ?: Int.MAX_VALUE
+                    val desired = old.cantidad + draft.cantidad
+                    val newQty = desired.coerceAtMost(maxStock)
+
+                    copy[idx] = old.copy(cantidad = newQty)
+                    copy
+                } else {
+                    val maxStock = draft.stockAvailable ?: Int.MAX_VALUE
+                    val newQty = draft.cantidad.coerceAtMost(maxStock)
+                    current + draft.copy(cantidad = newQty)
+                }
+            }
+            recomputeCount(_items.value)
+
+            // 2) Si no está logeado, solo carrito local
+            if (!isLogged()) return@launch
+
+            // 3) Si está logeado: sincronizar con backend
             try {
-                if (draft.variantId != null) {
-                    ApiClient.orders.addItem(AddItemReq(draft.variantId, draft.cantidad))
-                    refreshFromBackendIfLogged()
+                val variantId = draft.variantId
+                if (variantId == null) {
+                    Log.w("CartViewModel", "No hay variantId en draft, no se puede sincronizar con backend")
                     return@launch
                 }
 
-                // logeado -> backend real (fallback si no viene variantId)
-                val variants = ApiClient.catalog.listVariantsByProduct(draft.productId)
-                val match = variants.firstOrNull {
-                    it.sizeValue.equals(draft.talla, true) &&
-                            it.color.equals(draft.color, true)
-                } ?: variants.firstOrNull()
+                val qty = draft.cantidad.coerceAtLeast(1)
+                ApiClient.orders.addItem(
+                    AddItemReq(
+                        variantId = variantId,
+                        quantity = qty
+                    )
+                )
 
-                if (match != null) {
-                    ApiClient.orders.addItem(AddItemReq(match.id, draft.cantidad))
-                    refreshFromBackendIfLogged()
-                }
-            } catch (_: Exception) {
-                // no crashea
+                reloadFromBackend()
+            } catch (e: Exception) {
+                Log.e("CartViewModel", "Error agregando item en backend", e)
             }
         }
     }
 
-    // ========= MODIFICAR CANTIDAD =========
+    /**
+     * Cambiar cantidad de un item.
+     */
     fun updateQty(item: CartItem, newQty: Int) {
         viewModelScope.launch {
-            if (!isLogged() || item.itemId == null) {
-                _items.update { list ->
-                    list.map { if (it == item) it.copy(cantidad = newQty) else it }
+            val safeQty = newQty.coerceAtLeast(1)
+
+            _items.update { list ->
+                list.map {
+                    if (it == item) it.copy(cantidad = safeQty) else it
                 }
-                recomputeCount(_items.value)
-                return@launch
             }
+            recomputeCount(_items.value)
+
+            if (!isLogged() || item.itemId == null) return@launch
 
             try {
-                ApiClient.orders.updateItem(item.itemId, UpdateQtyReq(newQty))
-                refreshFromBackendIfLogged()
-            } catch (_: Exception) {
-                // no crashea
+                ApiClient.orders.updateItem(item.itemId, UpdateQtyReq(safeQty))
+                reloadFromBackend()
+            } catch (e: Exception) {
+                Log.e("CartViewModel", "Error actualizando cantidad en backend", e)
             }
         }
     }
 
-    // ========= ELIMINAR ITEM =========
-    fun remove(item: CartItem) {
+    /**
+     * Eliminar un producto del carrito.
+     */
+    fun removeItem(item: CartItem) {
         viewModelScope.launch {
-            if (!isLogged() || item.itemId == null) {
-                _items.update { list -> list.filterNot { it == item } }
-                recomputeCount(_items.value)
-                return@launch
-            }
+            _items.update { list -> list.filterNot { it == item } }
+            recomputeCount(_items.value)
+
+            if (!isLogged() || item.itemId == null) return@launch
 
             try {
                 ApiClient.orders.deleteItem(item.itemId)
-                refreshFromBackendIfLogged()
-            } catch (_: Exception) {
-                // no crashea
+                reloadFromBackend()
+            } catch (e: Exception) {
+                Log.e("CartViewModel", "Error eliminando item en backend", e)
             }
         }
     }
 
-    // ========= VACIAR =========
+    /**
+     * Vaciar carrito SOLO local (se usa al hacer logout).
+     */
+    fun clearLocal() {
+        _items.value = emptyList()
+        _count.value = 0
+    }
+
+    /**
+     * Vaciar carrito local + backend.
+     * Esto es lo que probablemente llama CarroScreen con cartVm.clear().
+     */
     fun clear() {
         viewModelScope.launch {
-            if (!isLogged()) {
-                _items.value = emptyList()
-                recomputeCount(emptyList())
-                return@launch
-            }
+            // limpiar local
+            _items.value = emptyList()
+            _count.value = 0
+
+            // si no hay login, no intentamos backend
+            if (!isLogged()) return@launch
 
             try {
                 ApiClient.orders.clearCart()
-                refreshFromBackendIfLogged()
-            } catch (_: Exception) {
-                // no crashea
+            } catch (e: Exception) {
+                Log.e("CartViewModel", "Error limpiando carrito en backend", e)
             }
         }
     }
+
+    // ==========================
+    // Utilidades
+    // ==========================
 
     private fun formatCLP(n: Int): String {
         val s = String.format(Locale.US, "%,d", n)

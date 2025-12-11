@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
@@ -43,4 +44,12 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Override
     @EntityGraph(attributePaths = {"category", "brand"})
     List<Product> findAll();
+
+    // ========= NUEVO: detalle con relaciones =========
+    /**
+     * Usado para /products/{id} (detalle).
+     * Carga category y brand para evitar proxies de Hibernate.
+     */
+    @EntityGraph(attributePaths = {"category", "brand"})
+    Optional<Product> findDetailById(Long id);
 }

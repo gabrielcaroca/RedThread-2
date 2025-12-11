@@ -21,6 +21,7 @@ import com.example.redthread.ui.screen.catalog.UploadImageScreen
 import com.example.redthread.ui.theme.Black
 import com.example.redthread.ui.viewmodel.*
 import com.example.redthread.domain.enums.UserRole
+import com.example.redthread.ui.screen.MetodoPago
 import com.example.redthread.data.remote.ApiClient
 import com.example.redthread.data.repository.CatalogRepository
 import java.net.URLEncoder
@@ -36,9 +37,17 @@ fun AppNavGraph(
     val cartVm: CartViewModel = viewModel()
     val cartCount by cartVm.count.collectAsState()
 
+    // 1) Al iniciar la app, intenta cargar carrito desde backend si hay token
+    LaunchedEffect(Unit) {
+        cartVm.refreshFromBackendIfLogged()
+    }
+
+    // 2) Cada vez que cambie el header (ej: login después de estar deslogeado),
+    //    si ahora está logeado, volvemos a sincronizar carrito.
     LaunchedEffect(header.isLoggedIn, header.email) {
-        if (header.isLoggedIn) cartVm.refreshFromBackendIfLogged()
-        else cartVm.clear()
+        if (header.isLoggedIn) {
+            cartVm.refreshFromBackendIfLogged()
+        }
     }
 
     Scaffold(
@@ -72,7 +81,7 @@ fun AppNavGraph(
         ) {
 
             // ============================================================
-            // HOME (ARREGLADO — antes causaba el crash)
+            // HOME
             // ============================================================
             composable(Route.Home.path) {
 
@@ -142,7 +151,12 @@ fun AppNavGraph(
                     }
                     PerfilScreen(
                         role = role,
-                        onLogout = { authViewModel.logout() },
+                        // 3) AL HACER LOGOUT: solo limpiamos carrito local
+                        //    (el backend mantiene el carrito del usuario).
+                        onLogout = {
+                            authViewModel.logout()
+                            cartVm.clearLocal()
+                        },
                         onGoAdmin = { navController.navigate(Route.VistaModerador.path) },
                         onGoDespachador = { navController.navigate(Route.Despachador.path) },
                         navController = navController,
@@ -273,9 +287,8 @@ fun AppNavGraph(
                     categoria = dec(backStack.arguments?.getString("categoria")),
                     cartVm = cartVm,
                     onAddedToCart = {},
-                    nav = navController                      // ← agregado
+                    navController = navController
                 )
-
             }
 
             // FORGOT PASSWORD
@@ -290,9 +303,7 @@ fun AppNavGraph(
                 )
             }
 
-            // ============================================================
             // CREAR PRODUCTO
-            // ============================================================
             composable(Route.CrearProducto.path) {
 
                 val app = LocalContext.current.applicationContext as Application
@@ -321,18 +332,14 @@ fun AppNavGraph(
                 val factory = CatalogVmFactory(app, repo)
                 val vm: CatalogViewModel = viewModel(factory = factory)
 
-                // LO ÚNICO IMPORTANTE: mandar productId
                 CreateProductScreen(
                     vm = vm,
-                    productId = id,   // ← ESTO ES ESENCIAL
+                    productId = id,
                     onNext = { variantId ->
-                        // Aquí no importa mucho ahora
                         navController.navigate("admin/variant/edit/$id/$variantId")
                     }
                 )
             }
-
-
 
             // CREAR VARIANTE
             composable(
