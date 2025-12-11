@@ -8,6 +8,7 @@ import androidx.compose.ui.unit.dp
 import com.example.redthread.data.remote.dto.CreateVariantRequest
 import com.example.redthread.ui.components.DropdownMenuBox
 import com.example.redthread.ui.viewmodel.CatalogViewModel
+import com.example.redthread.domain.validation.validateStock
 
 @Composable
 fun CreateVariantScreen(
@@ -24,7 +25,10 @@ fun CreateVariantScreen(
 
     var color by remember { mutableStateOf("") }
     var sku by remember { mutableStateOf("") }
+
     var stock by remember { mutableStateOf("") }
+
+    var stockError by remember { mutableStateOf<String?>(null) }
 
     fun generateSku() {
         if (sizeType.isNotEmpty() && sizeValue.isNotEmpty() && color.isNotEmpty()) {
@@ -96,11 +100,23 @@ fun CreateVariantScreen(
         // ======================
         OutlinedTextField(
             value = stock,
-            onValueChange = { stock = it.filter { c -> c.isDigit() } },
+            onValueChange = {
+                stock = it.filter { c -> c.isDigit() }      // Solo números
+                stockError = validateStock(stock)           // Validación en vivo
+            },
             label = { Text("Stock inicial") },
+            isError = stockError != null,
             singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
+
+        if (stockError != null) {
+            Text(
+                text = stockError ?: "",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall
+            )
+        }
 
         Spacer(Modifier.height(12.dp))
 
@@ -122,7 +138,19 @@ fun CreateVariantScreen(
         // ======================
         Button(
             onClick = {
-                if (sizeType.isBlank() || sizeValue.isBlank() || color.isBlank()) return@Button
+
+                // Validaciones básicas
+                if (sizeType.isBlank() ||
+                    sizeValue.isBlank() ||
+                    color.isBlank()
+                ) return@Button
+
+                // Validar stock
+                val err = validateStock(stock)
+                if (err != null) {
+                    stockError = err
+                    return@Button
+                }
 
                 val req = CreateVariantRequest(
                     productId = productId,
@@ -131,7 +159,7 @@ fun CreateVariantScreen(
                     color = color,
                     sku = sku,
                     priceOverride = null,
-                    stock = stock.toIntOrNull() ?: 0
+                    stock = stock.toInt()      // Ahora seguro es válido
                 )
 
                 vm.createVariant(req) { onNext() }

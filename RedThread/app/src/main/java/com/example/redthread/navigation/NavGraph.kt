@@ -37,13 +37,12 @@ fun AppNavGraph(
     val cartVm: CartViewModel = viewModel()
     val cartCount by cartVm.count.collectAsState()
 
-    // 1) Al iniciar la app, intenta cargar carrito desde backend si hay token
+    // Cargar carrito al iniciar app
     LaunchedEffect(Unit) {
         cartVm.refreshFromBackendIfLogged()
     }
 
-    // 2) Cada vez que cambie el header (ej: login después de estar deslogeado),
-    //    si ahora está logeado, volvemos a sincronizar carrito.
+    // Cargar carrito al logearse
     LaunchedEffect(header.isLoggedIn, header.email) {
         if (header.isLoggedIn) {
             cartVm.refreshFromBackendIfLogged()
@@ -60,7 +59,7 @@ fun AppNavGraph(
                     }
                 },
                 onPerfilClick = {
-                    if (authViewModel.header.value.isLoggedIn)
+                    if (header.isLoggedIn)
                         navController.navigate(Route.Perfil.path)
                     else
                         navController.navigate(Route.Login.path)
@@ -84,7 +83,6 @@ fun AppNavGraph(
             // HOME
             // ============================================================
             composable(Route.Home.path) {
-
                 val app = LocalContext.current.applicationContext as Application
                 val repo = CatalogRepository(ApiClient.catalog)
                 val factory = CatalogVmFactory(app, repo)
@@ -104,6 +102,7 @@ fun AppNavGraph(
                     onCarritoClick = { navController.navigate(Route.Carrito.path) }
                 )
             }
+
 
             // LOGIN
             composable(Route.Login.path) {
@@ -139,6 +138,7 @@ fun AppNavGraph(
                 )
             }
 
+
             // PERFIL
             composable(Route.Perfil.path) {
                 if (!header.isLoggedIn) {
@@ -151,8 +151,6 @@ fun AppNavGraph(
                     }
                     PerfilScreen(
                         role = role,
-                        // 3) AL HACER LOGOUT: solo limpiamos carrito local
-                        //    (el backend mantiene el carrito del usuario).
                         onLogout = {
                             authViewModel.logout()
                             cartVm.clearLocal()
@@ -165,6 +163,7 @@ fun AppNavGraph(
                 }
             }
 
+
             // CARRITO
             composable(Route.Carrito.path) {
                 CarroScreen(
@@ -172,6 +171,7 @@ fun AppNavGraph(
                     onGoCheckout = { navController.navigate(Route.Checkout.path) }
                 )
             }
+
 
             // CHECKOUT
             composable(Route.Checkout.path) {
@@ -185,6 +185,7 @@ fun AppNavGraph(
                     }
                 )
             }
+
 
             // PAYMENT
             composable(
@@ -206,6 +207,7 @@ fun AppNavGraph(
                     onFinish = { navController.popBackStack(Route.Home.path, false) }
                 )
             }
+
 
             // ============================================================
             // ADMIN (Vista Moderador)
@@ -229,18 +231,20 @@ fun AppNavGraph(
                         navController.navigate("editar-producto/$productId")
                     }
                 )
-
             }
+
 
             // DESPACHADOR
             composable(Route.Despachador.path) {
                 DespachadorScreen()
             }
 
-            // HISTORIAL COMPRAS
+
+            // HISTORIAL
             composable(Route.HistorialCompras.path) {
                 HistorialComprasScreen(navController)
             }
+
 
             // DETALLE COMPRA
             composable(
@@ -271,6 +275,7 @@ fun AppNavGraph(
                 )
             }
 
+
             // DETALLE PRODUCTO
             composable(
                 "${Route.ProductoDetalle.path}?id={id}&nombre={nombre}&precio={precio}&categoria={categoria}"
@@ -291,7 +296,8 @@ fun AppNavGraph(
                 )
             }
 
-            // FORGOT PASSWORD
+
+            // FORGOT
             composable(Route.Forgot.path) {
                 ForgotPasswordScreenVm(
                     vm = authViewModel,
@@ -302,6 +308,7 @@ fun AppNavGraph(
                     }
                 )
             }
+
 
             // CREAR PRODUCTO
             composable(Route.CrearProducto.path) {
@@ -319,7 +326,8 @@ fun AppNavGraph(
                 )
             }
 
-            // EDITAR PRODUCTO
+
+            // EDITAR PRODUCTO — FINAL LIMPIO Y CORRECTO
             composable(
                 "editar-producto/{productId}",
                 arguments = listOf(navArgument("productId") { type = NavType.IntType })
@@ -335,11 +343,12 @@ fun AppNavGraph(
                 CreateProductScreen(
                     vm = vm,
                     productId = id,
-                    onNext = { variantId ->
-                        navController.navigate("admin/variant/edit/$id/$variantId")
+                    onNext = {
+                        navController.popBackStack()   // ✔️ ESTA ES LA BUENA
                     }
                 )
             }
+
 
             // CREAR VARIANTE
             composable(
@@ -362,6 +371,7 @@ fun AppNavGraph(
                     }
                 )
             }
+
 
             // SUBIR IMAGEN
             composable(

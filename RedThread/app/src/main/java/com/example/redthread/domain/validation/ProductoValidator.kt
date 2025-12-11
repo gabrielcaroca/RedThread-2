@@ -13,3 +13,13 @@ fun validatePrice(price: String): String? {
     return null
 }
 
+fun validateStock(stock: String): String? {
+    if (stock.isBlank()) return "El stock es obligatorio"
+
+    val value = stock.toIntOrNull()
+        ?: return "Debe ser un número entero válido"
+
+    if (value < 1) return "El stock debe ser mayor que 0"
+
+    return null
+}
