@@ -177,9 +177,19 @@ class AuthViewModel(
         recomputeRegisterCanSubmit()
     }
 
+    // (compatibilidad) lo que ya usabas antes
     suspend fun resetPasswordByEmailOrPhone(identifier: String, newPass: String): Boolean {
-        return authRepo.resetPassword(identifier, newPass)
+        return authRepo.confirmResetPassword(identifier, newPass)
     }
+
+    suspend fun requestResetCode(identifier: String): Boolean {
+        return authRepo.requestResetCode(identifier)
+    }
+
+    suspend fun confirmResetPassword(identifier: String, newPass: String): Boolean {
+        return authRepo.confirmResetPassword(identifier, newPass)
+    }
+
 
     fun clearRegisterResult() {
         _register.update {
@@ -229,7 +239,7 @@ class AuthViewModel(
                         name = profile?.fullName ?: s.name.trim(),
                         userId = profile?.id?.toString(),
                         role = profile?.roles?.firstOrNull() ?: "CLIENTE",
-                        token = rawToken      // ⭐ IMPORTANTE
+                        token = rawToken
                     )
 
                 }

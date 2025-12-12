@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.redthread.ui.theme.Black
 import com.example.redthread.ui.theme.TextPrimary
 import com.example.redthread.ui.theme.TextSecondary
@@ -23,14 +22,14 @@ private enum class ForgotStep { IDENTIFY, OTP, RESET, DONE }
 
 @Composable
 fun ForgotPasswordScreenVm(
-    vm: AuthViewModel,              // <- lo recibimos desde el NavGraph
+    vm: AuthViewModel,
     onDoneGoLogin: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var step by remember { mutableStateOf(ForgotStep.IDENTIFY) }
 
-    var identifier by remember { mutableStateOf("") }        // email o teléfono
-    var otp by remember { mutableStateOf("") }                // cualquier número, simulado
+    var identifier by remember { mutableStateOf("") }        // correo
+    var otp by remember { mutableStateOf("") }                // cualquier número
     var newPass by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var info by remember { mutableStateOf<String?>(null) }
@@ -49,36 +48,53 @@ fun ForgotPasswordScreenVm(
         Spacer(Modifier.height(16.dp))
 
         when (step) {
+
             ForgotStep.IDENTIFY -> {
                 Text(
-                    "Ingresa tu correo o teléfono. Te enviaremos un código para continuar.",
+                    "Ingresa tu correo. Te enviaremos un código para continuar.",
                     color = TextSecondary
                 )
                 Spacer(Modifier.height(12.dp))
                 OutlinedTextField(
                     value = identifier,
                     onValueChange = { identifier = it.trim() },
-                    label = { Text("Correo o Teléfono") },
+                    label = { Text("Correo") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
+
                 Button(
                     onClick = {
                         error = null
+                        info = null
+
                         if (identifier.isBlank()) {
-                            error = "Escribe tu correo o teléfono"
+                            error = "Escribe tu correo"
                             return@Button
                         }
-                        // Simulado: pasamos al OTP y mostramos el “tipo”
-                        val type = if (identifier.contains("@")) "correo" else "SMS"
-                        info = "Se te envió un código por $type."
-                        step = ForgotStep.OTP
+                        if (!identifier.contains("@")) {
+                            error = "Escribe un correo válido"
+                            return@Button
+                        }
+
+                        isSending = true
+                        scope.launch {
+                            val ok = vm.requestResetCode(identifier)
+                            isSending = false
+
+                            if (ok) {
+                                info = "Código enviado a tu correo."
+                                step = ForgotStep.OTP
+                            } else {
+                                error = "No encontramos un usuario con ese correo"
+                            }
+                        }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isSending
-                ) { Text("Enviar código") }
+                ) { Text(if (isSending) "Enviando..." else "Enviar código") }
 
                 if (info != null) { Spacer(Modifier.height(8.dp)); Text(info!!, color = TextSecondary) }
                 if (error != null) { Spacer(Modifier.height(8.dp)); Text(error!!, color = MaterialTheme.colorScheme.error) }
@@ -96,14 +112,15 @@ fun ForgotPasswordScreenVm(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
+
                 Button(
                     onClick = {
-                        // Simulado: aceptamos cualquier OTP no vacío
+                        error = null
                         if (otp.isBlank()) {
                             error = "Ingresa el código"
                             return@Button
                         }
-                        error = null
+                        // ✅ cualquier código es válido
                         step = ForgotStep.RESET
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -135,29 +152,32 @@ fun ForgotPasswordScreenVm(
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(Modifier.height(16.dp))
+
                 Button(
                     onClick = {
                         error = null
+
                         if (newPass.length < 6) {
-                            error = "La contraseña debe tener al menos 6 caracteres"; return@Button
+                            error = "La contraseña debe tener al menos 6 caracteres"
+                            return@Button
                         }
                         if (newPass != confirm) {
-                            error = "Las contraseñas no coinciden"; return@Button
+                            error = "Las contraseñas no coinciden"
+                            return@Button
                         }
+
                         isSending = true
                         scope.launch {
-                            val ok = vm.resetPasswordByEmailOrPhone(identifier, newPass)
+                            val ok = vm.confirmResetPassword(identifier, newPass)
                             isSending = false
-                            if (ok) {
-                                step = ForgotStep.DONE
-                            } else {
-                                error = "No encontramos un usuario con esos datos"
-                            }
+
+                            if (ok) step = ForgotStep.DONE
+                            else error = "No se pudo cambiar la contraseña"
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isSending
-                ) { Text("Cambiar contraseña") }
+                ) { Text(if (isSending) "Cambiando..." else "Cambiar contraseña") }
 
                 if (error != null) { Spacer(Modifier.height(8.dp)); Text(error!!, color = MaterialTheme.colorScheme.error) }
             }

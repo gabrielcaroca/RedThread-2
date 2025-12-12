@@ -78,7 +78,6 @@ class AuthRepository(
                     req = UpdateMeRequest(fullName = fullName, email = email)
                 )
 
-                // ✅ refrescar session para que header se actualice
                 session.setSession(
                     logged = true,
                     email = resp.email,
@@ -120,9 +119,27 @@ class AuthRepository(
         }
 
     // =========================
-    // RESET PASSWORD
+    // FORGOT PASSWORD
     // =========================
-    suspend fun resetPassword(identifier: String, newPass: String): Boolean =
+
+    // Paso 1: validar que el correo exista
+    suspend fun requestResetCode(identifier: String): Boolean =
+        withContext(Dispatchers.IO) {
+            try {
+                val body = mapOf(
+                    "identifier" to identifier
+                )
+
+                val resp = ApiClient.identity.requestResetPassword(body)
+                resp.isSuccessful
+
+            } catch (e: Exception) {
+                false
+            }
+        }
+
+    // Paso 2: confirmar y cambiar contraseña
+    suspend fun confirmResetPassword(identifier: String, newPass: String): Boolean =
         withContext(Dispatchers.IO) {
             try {
                 val body = mapOf(
@@ -130,7 +147,7 @@ class AuthRepository(
                     "newPassword" to newPass
                 )
 
-                val resp = ApiClient.identity.resetPassword(body)
+                val resp = ApiClient.identity.confirmResetPassword(body)
                 resp.isSuccessful
 
             } catch (e: Exception) {

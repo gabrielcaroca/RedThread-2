@@ -36,7 +36,11 @@ interface AuthApi {
         @Body req: ChangePasswordRequest
     ): Response<Void>
 
-    // 🔥 Usamos /auth/reset-password (NO /confirm)
+    // Paso 1: validar que exista el usuario (y "enviar" código)
     @POST("auth/reset-password")
-    suspend fun resetPassword(@Body body: Map<String, String>): Response<Void>
+    suspend fun requestResetPassword(@Body body: Map<String, String>): Response<Void>
+
+    // Paso 2: confirmar y cambiar la contraseña realmente
+    @POST("auth/reset-password/confirm")
+    suspend fun confirmResetPassword(@Body body: Map<String, String>): Response<Void>
 }
