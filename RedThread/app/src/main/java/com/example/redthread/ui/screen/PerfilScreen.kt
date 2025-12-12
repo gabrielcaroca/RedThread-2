@@ -7,8 +7,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.outlined.StarOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -47,6 +45,9 @@ fun PerfilScreen(
 
     var showDialog by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf<AddressDto?>(null) }
+
+    var showEditProfile by remember { mutableStateOf(false) }
+    var showChangePassword by remember { mutableStateOf(false) }
 
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -104,7 +105,27 @@ fun PerfilScreen(
             ) {
                 Column(Modifier.padding(12.dp)) {
                     EncabezadoPerfil(header)
+
                     Spacer(Modifier.height(10.dp))
+
+                    // ✅ Editar perfil
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = { showEditProfile = true },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Editar perfil") }
+
+                        OutlinedButton(
+                            onClick = { showChangePassword = true },
+                            modifier = Modifier.weight(1f)
+                        ) { Text("Cambiar contraseña") }
+                    }
+
+                    Spacer(Modifier.height(10.dp))
+
                     when (dynamicRole) {
                         UserRole.ADMINISTRADOR -> BotonRol("Ir al Panel de Administrador", onGoAdmin)
                         UserRole.DESPACHADOR -> BotonRol("Ir al Panel de Despachador", onGoDespachador)
@@ -116,7 +137,7 @@ fun PerfilScreen(
             Spacer(Modifier.height(16.dp))
 
             // ==========================
-            // DIRECCIONES (Modificado)
+            // DIRECCIONES (sin default)
             // ==========================
             SeccionDirecciones(
                 addresses = state.addresses,
@@ -131,7 +152,6 @@ fun PerfilScreen(
                 onDelete = { dir ->
                     vm.deleteAddress(dir.id.toLong())
                 }
-                // ❌ ELIMINADO: onSetDefault ya no se pasa
             )
 
             Spacer(Modifier.height(24.dp))
@@ -162,12 +182,12 @@ fun PerfilScreen(
         }
     }
 
-    // Diálogo de dirección
+    // Diálogo de dirección (✅ sin predeterminada)
     if (showDialog) {
         DialogDireccion(
             edit = editing,
             onDismiss = { showDialog = false },
-            onSave = { line1, city, stateValue, zip, country, isDefault ->
+            onSave = { line1, city, stateValue, zip, country ->
                 if (editing == null) {
                     vm.createAddress(
                         line1 = line1,
@@ -175,7 +195,7 @@ fun PerfilScreen(
                         state = stateValue,
                         zip = zip,
                         country = country,
-                        isDefault = isDefault
+                        isDefault = false // ✅ forzado
                     )
                 } else {
                     vm.updateAddress(
@@ -185,10 +205,34 @@ fun PerfilScreen(
                         state = stateValue,
                         zip = zip,
                         country = country,
-                        default = isDefault
+                        default = false // ✅ forzado
                     )
                 }
                 showDialog = false
+            }
+        )
+    }
+
+    // ✅ Editar perfil (nombre/correo)
+    if (showEditProfile) {
+        DialogEditarPerfil(
+            nameInit = header.displayName ?: "",
+            emailInit = header.email ?: "",
+            onDismiss = { showEditProfile = false },
+            onSave = { fullName, email ->
+                vm.updateProfile(fullName = fullName, email = email)
+                showEditProfile = false
+            }
+        )
+    }
+
+    // ✅ Cambiar contraseña (actual + nueva)
+    if (showChangePassword) {
+        DialogCambiarPassword(
+            onDismiss = { showChangePassword = false },
+            onSave = { current, newPass ->
+                vm.changePassword(currentPassword = current, newPassword = newPass)
+                showChangePassword = false
             }
         )
     }
@@ -214,7 +258,7 @@ private fun BotonRol(texto: String, onClick: () -> Unit) {
 }
 
 // =========================
-// LISTA DE DIRECCIONES (CORREGIDO)
+// LISTA DE DIRECCIONES (sin default)
 // =========================
 @Composable
 private fun SeccionDirecciones(
@@ -222,7 +266,6 @@ private fun SeccionDirecciones(
     onAdd: () -> Unit,
     onEdit: (AddressDto) -> Unit,
     onDelete: (AddressDto) -> Unit
-    // ❌ ELIMINADO: onSetDefault del parámetro
 ) {
     Row(
         Modifier.fillMaxWidth(),
@@ -245,22 +288,7 @@ private fun SeccionDirecciones(
                 ) {
                     Column(Modifier.padding(12.dp)) {
 
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (dir.default) {
-                                Icon(
-                                    Icons.Filled.Star,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Icon(
-                                    Icons.Outlined.StarOutline,
-                                    contentDescription = null
-                                )
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            Text("${dir.city}, ${dir.country}")
-                        }
+                        Text("${dir.city}, ${dir.country}", fontWeight = FontWeight.Medium)
 
                         Spacer(Modifier.height(6.dp))
                         Text(text = dir.line1)
@@ -271,32 +299,16 @@ private fun SeccionDirecciones(
 
                         Spacer(Modifier.height(8.dp))
 
-                        // 👇 AQUÍ ESTÁ EL CAMBIO PRINCIPAL
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Si es default mostramos texto estático. Si no, espacio vacío.
-                            if (dir.default) {
-                                Text(
-                                    text = "Predeterminada",
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelLarge
-                                )
-                            } else {
-                                Spacer(Modifier.width(1.dp))
+                            IconButton(onClick = { onEdit(dir) }) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Editar")
                             }
-
-                            // Botones de acción (Editar/Eliminar)
-                            Row {
-                                IconButton(onClick = { onEdit(dir) }) {
-                                    Icon(Icons.Filled.Edit, contentDescription = "Editar")
-                                }
-                                IconButton(onClick = { onDelete(dir) }) {
-                                    Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
-                                }
+                            IconButton(onClick = { onDelete(dir) }) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Eliminar")
                             }
                         }
                     }
@@ -315,8 +327,7 @@ private fun DialogDireccion(
         city: String,
         state: String,
         zip: String,
-        country: String,
-        isDefault: Boolean
+        country: String
     ) -> Unit
 ) {
     var line1 by remember { mutableStateOf(edit?.line1 ?: "") }
@@ -324,7 +335,6 @@ private fun DialogDireccion(
     var state by remember { mutableStateOf(edit?.state ?: "") }
     var zip by remember { mutableStateOf(edit?.zip ?: "") }
     var country by remember { mutableStateOf(edit?.country ?: "Chile") }
-    var isDefault by remember { mutableStateOf(edit?.default ?: false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -333,9 +343,7 @@ private fun DialogDireccion(
                     state.isNotBlank() && country.isNotBlank()
 
             Button(
-                onClick = {
-                    onSave(line1, city, state, zip, country, isDefault)
-                },
+                onClick = { onSave(line1, city, state, zip, country) },
                 enabled = canSave
             ) { Text("Guardar") }
         },
@@ -348,12 +356,90 @@ private fun DialogDireccion(
                 OutlinedTextField(value = state, onValueChange = { state = it }, label = { Text("Región/Estado") })
                 OutlinedTextField(value = zip, onValueChange = { zip = it }, label = { Text("Código postal") })
                 OutlinedTextField(value = country, onValueChange = { country = it }, label = { Text("País") })
+            }
+        }
+    )
+}
 
-                // El checkbox sigue aquí para cuando CREAS o EDITAS la dirección
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isDefault, onCheckedChange = { isDefault = it })
-                    Text("Predeterminada")
-                }
+@Composable
+private fun DialogEditarPerfil(
+    nameInit: String,
+    emailInit: String,
+    onDismiss: () -> Unit,
+    onSave: (fullName: String, email: String) -> Unit
+) {
+    var fullName by remember { mutableStateOf(nameInit) }
+    var email by remember { mutableStateOf(emailInit) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            val canSave = fullName.isNotBlank() && email.isNotBlank()
+            Button(
+                onClick = { onSave(fullName, email) },
+                enabled = canSave
+            ) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        title = { Text("Editar perfil") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Nombre") }
+                )
+                OutlinedTextField(
+                    value = email,
+                    onValueChange = { email = it },
+                    label = { Text("Correo") }
+                )
+            }
+        }
+    )
+}
+
+@Composable
+private fun DialogCambiarPassword(
+    onDismiss: () -> Unit,
+    onSave: (current: String, newPass: String) -> Unit
+) {
+    var current by remember { mutableStateOf("") }
+    var newPass by remember { mutableStateOf("") }
+    var confirm by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            val canSave = current.isNotBlank() &&
+                    newPass.isNotBlank() &&
+                    confirm.isNotBlank() &&
+                    (newPass == confirm)
+
+            Button(
+                onClick = { onSave(current, newPass) },
+                enabled = canSave
+            ) { Text("Cambiar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        title = { Text("Cambiar contraseña") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = current,
+                    onValueChange = { current = it },
+                    label = { Text("Contraseña actual") }
+                )
+                OutlinedTextField(
+                    value = newPass,
+                    onValueChange = { newPass = it },
+                    label = { Text("Nueva contraseña") }
+                )
+                OutlinedTextField(
+                    value = confirm,
+                    onValueChange = { confirm = it },
+                    label = { Text("Confirmar nueva contraseña") }
+                )
             }
         }
     )

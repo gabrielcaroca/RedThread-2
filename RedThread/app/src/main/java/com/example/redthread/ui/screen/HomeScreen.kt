@@ -108,12 +108,17 @@ fun HomeScreen(
     // Filtro por pestañas
     val baseActual = remember(productosMapeados, filtro) {
         when (filtro) {
-            Filtro.TODOS -> productosMapeados
+            // "Principal": SOLO featured = true
+            Filtro.TODOS -> productosMapeados.filter { it.dtoOriginal?.featured == true }
+
+            // "Hombres": SOLO gender = 'HOMBRE'
             Filtro.HOMBRES -> productosMapeados.filter {
-                it.nombre.contains("Hombre", true) || it.categoria.contains("Hombre", true)
+                it.dtoOriginal?.gender.equals("HOMBRE", ignoreCase = true)
             }
+
+            // "Mujeres": SOLO gender = 'MUJER'
             Filtro.MUJERES -> productosMapeados.filter {
-                it.nombre.contains("Mujer", true) || it.categoria.contains("Mujer", true)
+                it.dtoOriginal?.gender.equals("MUJER", ignoreCase = true)
             }
         }
     }

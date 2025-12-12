@@ -1,4 +1,3 @@
-// ProfileViewModel.kt
 package com.example.redthread.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
@@ -7,6 +6,7 @@ import com.example.redthread.data.remote.dto.AddressDto
 import com.example.redthread.data.remote.dto.CreateAddressRequest
 import com.example.redthread.data.remote.dto.UpdateAddressRequest
 import com.example.redthread.data.repository.AddressRepository
+import com.example.redthread.data.repository.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -20,7 +20,8 @@ data class ProfileState(
 )
 
 class ProfileViewModel(
-    private val repo: AddressRepository
+    private val repo: AddressRepository,
+    private val authRepo: AuthRepository
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(ProfileState())
@@ -47,10 +48,9 @@ class ProfileViewModel(
             startLoading()
             try {
                 val list = repo.list()
-                _state.update { it.copy(addresses = list) }
-                finishSuccess("Direcciones cargadas")
+                _state.update { it.copy(addresses = list, loading = false) }
             } catch (e: Exception) {
-                finishError(e.message ?: "Error al cargar direcciones")
+                finishError(e.message ?: "No se pudieron cargar direcciones")
             }
         }
     }
@@ -68,18 +68,18 @@ class ProfileViewModel(
             try {
                 val req = CreateAddressRequest(
                     line1 = line1,
-                    line2 = "",          // si quieres soportar line2, agrégalo al diálogo
+                    line2 = "",
                     city = city,
                     state = state,
                     zip = zip,
                     country = country,
-                    default = isDefault
+                    default = false
                 )
                 repo.create(req)
                 loadAddresses()
                 finishSuccess("Dirección creada")
             } catch (e: Exception) {
-                finishError(e.message ?: "Error al crear dirección")
+                finishError(e.message ?: "No se pudo crear dirección")
             }
         }
     }
@@ -98,18 +98,18 @@ class ProfileViewModel(
             try {
                 val req = UpdateAddressRequest(
                     line1 = line1,
-                    line2 = "",          // igual que arriba
+                    line2 = "",
                     city = city,
                     state = state,
                     zip = zip,
                     country = country,
-                    default = default
+                    default = false
                 )
                 repo.update(id.toInt(), req)
                 loadAddresses()
                 finishSuccess("Dirección actualizada")
             } catch (e: Exception) {
-                finishError(e.message ?: "Error al actualizar dirección")
+                finishError(e.message ?: "No se pudo actualizar dirección")
             }
         }
     }
@@ -122,21 +122,32 @@ class ProfileViewModel(
                 loadAddresses()
                 finishSuccess("Dirección eliminada")
             } catch (e: Exception) {
-                finishError(e.message ?: "Error al eliminar dirección")
+                finishError(e.message ?: "No se pudo eliminar dirección")
             }
         }
     }
 
-    fun setDefaultAddress(id: Long) {
+    fun updateProfile(fullName: String, email: String) {
         viewModelScope.launch {
             startLoading()
             try {
-                val req = UpdateAddressRequest(default = true)
-                repo.update(id.toInt(), req)
-                loadAddresses()
-                finishSuccess("Predeterminada actualizada")
+                val res = authRepo.updateMe(fullName, email).getOrThrow()
+                finishSuccess("Perfil actualizado")
             } catch (e: Exception) {
-                finishError(e.message ?: "No se pudo marcar como predeterminada")
+                finishError(e.message ?: "No se pudo actualizar el perfil")
+            }
+        }
+    }
+
+    fun changePassword(currentPassword: String, newPassword: String) {
+        viewModelScope.launch {
+            startLoading()
+            try {
+                val ok = authRepo.changePassword(currentPassword, newPassword).getOrThrow()
+                if (ok) finishSuccess("Contraseña actualizada")
+                else finishError("No se pudo actualizar la contraseña")
+            } catch (e: Exception) {
+                finishError(e.message ?: "No se pudo actualizar la contraseña")
             }
         }
     }

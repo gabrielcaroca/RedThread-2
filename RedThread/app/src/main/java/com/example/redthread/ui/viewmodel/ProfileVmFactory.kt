@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.example.redthread.data.local.SessionPrefs
 import com.example.redthread.data.remote.ApiClient
 import com.example.redthread.data.repository.AddressRepository
+import com.example.redthread.data.repository.AuthRepository
 
 class ProfileVmFactory(private val context: Context) : ViewModelProvider.Factory {
 
@@ -16,11 +17,16 @@ class ProfileVmFactory(private val context: Context) : ViewModelProvider.Factory
             val sessionPrefs = SessionPrefs(context.applicationContext)
 
             val repo = AddressRepository(
-                api = ApiClient.address,        // baseUrl orders-service OK
+                api = ApiClient.address,
                 sessionPrefs = sessionPrefs
             )
 
-            return ProfileViewModel(repo) as T
+            val authRepo = AuthRepository(
+                context = context.applicationContext,
+                session = sessionPrefs
+            )
+
+            return ProfileViewModel(repo, authRepo) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
