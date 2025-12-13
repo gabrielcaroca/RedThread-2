@@ -62,8 +62,25 @@ interface CatalogApi {
         @Path("id") id: Long
     ): VariantDto
 
+    @GET("/variants/product/{productId}")
+    suspend fun getVariantsByProduct(
+        @Path("productId") productId: Int
+    ): List<VariantDto>
+
+    @GET("variants")
+    suspend fun getVariants(
+        @Query("productId") productId: Int
+    ): List<VariantDto>
+
+
     @POST("variants")
     suspend fun createVariant(
+        @Body req: CreateVariantRequest
+    ): VariantDto
+
+    @PUT("variants/{id}")
+    suspend fun updateVariant(
+        @Path("id") id: Int,
         @Body req: CreateVariantRequest
     ): VariantDto
 

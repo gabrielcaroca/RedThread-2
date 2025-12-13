@@ -3,6 +3,8 @@ package com.example.redthread.ui.screen
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -10,11 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import com.example.redthread.ui.viewmodel.DeveloperViewModel
 import com.example.redthread.ui.viewmodel.PedidoViewModel
 import com.example.redthread.ui.viewmodel.RutaViewModel
 import com.example.redthread.ui.viewmodel.CatalogViewModel
 import com.example.redthread.data.remote.dto.ProductDto
+import com.example.redthread.data.remote.dto.VariantDto
+import com.example.redthread.navigation.Route
 
 enum class DevTab { PRODUCTOS, PEDIDOS, RUTAS }
 
@@ -22,6 +27,7 @@ enum class DevTab { PRODUCTOS, PEDIDOS, RUTAS }
 fun DeveloperScreen(
     vm: DeveloperViewModel,
     catalogVm: CatalogViewModel,
+    navController: NavHostController,   // ← AGREGADO
     onCreateProduct: () -> Unit,
     onEditProduct: (Int) -> Unit
 ) {
@@ -44,6 +50,7 @@ fun DeveloperScreen(
         when (tab) {
             DevTab.PRODUCTOS -> ProductsTab(
                 catalogVm = catalogVm,
+                navController = navController,
                 onCreateProduct = onCreateProduct,
                 onEditProduct = onEditProduct
             )
@@ -57,23 +64,24 @@ fun DeveloperScreen(
                 vmRuta = viewModel()
             )
         }
-
     }
 }
+
 
 //////////////////////////////////////////////////////////////////
 // PRODUCTOS (API REMOTA)
 //////////////////////////////////////////////////////////////////
 
+
+
 @Composable
 fun ProductsTab(
     catalogVm: CatalogViewModel,
+    navController: NavHostController,
     onCreateProduct: () -> Unit,
     onEditProduct: (Int) -> Unit
 ) {
-    LaunchedEffect(Unit) {
-        catalogVm.loadProducts()
-    }
+    LaunchedEffect(Unit) { catalogVm.loadProducts() }
 
     val productos by catalogVm.products.collectAsState()
 
@@ -82,45 +90,59 @@ fun ProductsTab(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Button(
-            onClick = onCreateProduct,
-            colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.primary)
-        ) {
-            Text("Nuevo producto")
-        }
+        Button(onClick = onCreateProduct) { Text("Nuevo producto") }
 
         Spacer(Modifier.height(16.dp))
 
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Nombre", fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.4f))
-            Text("Categoría", fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.25f))
-            Text("Precio", fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.2f))
-            Text("Acción", fontWeight = FontWeight.Bold, modifier = Modifier.weight(0.15f))
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text("Nombre", modifier = Modifier.weight(0.4f))
+            Text("Categoría", modifier = Modifier.weight(0.25f))
+            Text("Precio", modifier = Modifier.weight(0.2f))
+            Text("Acción", modifier = Modifier.weight(0.15f))
         }
 
         Divider()
 
         LazyColumn {
             items(productos.sortedBy { it.name.lowercase() }) { p ->
+
                 ProductRowRemote(
                     p = p,
-                    onEditProduct = onEditProduct
+                    onEditProduct = onEditProduct,
+                    onEditVariants = { productId ->
+                        navController.navigate(Route.EditarVariantes.create(productId))
+                    }
                 )
+
+
+                // ---------- VARIANTES ----------
+                p.variants?.forEach { v ->
+                    VariantRowRemote(
+                        v = v,
+                        onEditVariant = { productId, variantId ->
+                            navController.navigate(
+                                Route.EditVariant.create(productId, variantId)
+                            )
+                        }
+                    )
+                }
+
                 Divider()
             }
         }
-
     }
 }
+
+
 
 @Composable
 fun ProductRowRemote(
     p: ProductDto,
-    onEditProduct: (Int) -> Unit
+    onEditProduct: (Int) -> Unit,
+    onEditVariants: (Int) -> Unit
 ) {
+    var expanded by remember { mutableStateOf(false) }
+
     Row(
         Modifier
             .fillMaxWidth()
@@ -130,20 +152,42 @@ fun ProductRowRemote(
         Text(p.name, modifier = Modifier.weight(0.4f))
         Text(p.category?.name ?: "-", modifier = Modifier.weight(0.25f))
         Text("$${"%,.0f".format(p.basePrice)}", modifier = Modifier.weight(0.2f))
+
         Row(
             modifier = Modifier.weight(0.15f),
             horizontalArrangement = Arrangement.End
         ) {
-            Button(
-                onClick = { onEditProduct(p.id) },  // 👈 AHORA SÍ HACE ALGO
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                modifier = Modifier.height(32.dp)
+
+            // BOTÓN DE MENÚ
+            IconButton(onClick = { expanded = true }) {
+                Icon(Icons.Default.MoreVert, contentDescription = "Opciones")
+            }
+
+            // MENÚ DESPLEGABLE
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
             ) {
-                Text("Editar")
+                DropdownMenuItem(
+                    text = { Text("Editar producto") },
+                    onClick = {
+                        expanded = false
+                        onEditProduct(p.id)
+                    }
+                )
+
+                DropdownMenuItem(
+                    text = { Text("Editar variantes") },
+                    onClick = {
+                        expanded = false
+                        onEditVariants(p.id)
+                    }
+                )
             }
         }
     }
 }
+
 
 
 //////////////////////////////////////////////////////////////////
@@ -225,6 +269,32 @@ fun PedidoItem(
 //////////////////////////////////////////////////////////////////
 // RUTAS
 //////////////////////////////////////////////////////////////////
+@Composable
+fun VariantRowRemote(
+    v: VariantDto,
+    onEditVariant: (productId: Int, variantId: Long) -> Unit
+) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 24.dp, bottom = 6.dp, top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        Text("${v.sizeType} - ${v.sizeValue}", modifier = Modifier.weight(0.3f))
+        Text(v.color, modifier = Modifier.weight(0.25f))
+        Text("Stock: ${v.stock ?: 0}", modifier = Modifier.weight(0.25f))
+
+        Button(
+            onClick = { onEditVariant(v.productId.toInt(), v.id.toLong()) },
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.height(28.dp)
+        ) {
+            Text("Editar")
+        }
+    }
+}
+
 
 @Composable
 fun UsersTab(vmRuta: RutaViewModel = viewModel()) {
@@ -286,4 +356,7 @@ fun RutaItem(
             Text("Pedidos: $pedidosCount")
         }
     }
+
+
+
 }

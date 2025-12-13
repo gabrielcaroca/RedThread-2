@@ -10,5 +10,6 @@ data class ProductDto(
     val category: CategoryDto?,
     val brand: BrandDto?,
     val featured: Boolean,
-    val gender: String
+    val gender: String,
+    val variants: List<VariantDto>? = emptyList()
 )

@@ -181,12 +181,14 @@ fun CreateProductScreen(
                 )
 
                 if (productId == null) {
+                    // Crear: necesitamos el id nuevo, así que dejamos el callback
                     vm.createProduct(req) { newId -> onNext(newId) }
                 } else {
-                    vm.updateProduct(productId, req) { updatedId ->
-                        onNext(updatedId)
-                    }
+                    // Editar: disparamos el update y navegamos de inmediato
+                    vm.updateProduct(productId, req) { /* opcional: podrías refrescar algo aquí */ }
+                    onNext(productId)
                 }
+
             },
             modifier = Modifier.fillMaxWidth(),
             enabled = !loading

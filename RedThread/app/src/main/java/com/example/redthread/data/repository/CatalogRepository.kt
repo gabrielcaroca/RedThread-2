@@ -25,12 +25,23 @@ class CatalogRepository(
     suspend fun updateProduct(id: Int, req: CreateProductRequest) =
         api.updateProduct(id, req)
 
+
+
     suspend fun deleteProduct(id: Int) =
         api.deleteProduct(id)
 
     // VARIANTES
     suspend fun createVariant(req: CreateVariantRequest) =
         api.createVariant(req)
+
+    suspend fun getVariant(id: Long) = api.getVariant(id)
+
+    suspend fun updateVariant(id: Long, req: CreateVariantRequest) =
+        api.updateVariant(id.toInt(), req)
+
+    suspend fun getVariantsByProduct(productId: Int): List<VariantDto> =
+        api.getVariants(productId)
+
 
     // IMÁGENES LOCAL (archivo)
     suspend fun uploadImage(id: Int, body: MultipartBody.Part) =

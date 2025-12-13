@@ -13,11 +13,14 @@ import com.example.redthread.domain.validation.validateStock
 @Composable
 fun CreateVariantScreen(
     productId: Int,
+    variantId: Long? = null,
     vm: CatalogViewModel,
     onNext: () -> Unit
 ) {
     val letterSizes = listOf("XXS", "XS", "S", "M", "L", "XL", "XXL")
     val euSizes = (39..46).map { it.toString() }
+
+    val variant by vm.currentVariant.collectAsState()
 
     var sizeType by remember { mutableStateOf("") }
     var selectedSizeIndex by remember { mutableStateOf(-1) }
@@ -25,47 +28,60 @@ fun CreateVariantScreen(
 
     var color by remember { mutableStateOf("") }
     var sku by remember { mutableStateOf("") }
-
     var stock by remember { mutableStateOf("") }
 
     var stockError by remember { mutableStateOf<String?>(null) }
 
-    fun generateSku() {
-        if (sizeType.isNotEmpty() && sizeValue.isNotEmpty() && color.isNotEmpty()) {
-            sku = "SKU-${sizeType.take(3)}-${sizeValue}-${color.take(3).uppercase()}-${System.currentTimeMillis() % 9999}"
+    // Cargar variante si estamos editando
+    LaunchedEffect(variantId) {
+        if (variantId != null) vm.loadVariant(variantId)
+    }
+
+    // Precargar datos
+    LaunchedEffect(variant) {
+        if (variant != null) {
+            sizeType = variant!!.sizeType
+            sizeValue = variant!!.sizeValue
+            color = variant!!.color
+            stock = variant!!.stock?.toString() ?: "0"
+            selectedSizeIndex =
+                if (sizeType == "EU") euSizes.indexOf(sizeValue)
+                else letterSizes.indexOf(sizeValue)
+
+            sku = variant!!.sku // mantenemos SKU original
         }
     }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .padding(24.dp)
-    ) {
+    fun generateSku() {
+        if (sizeType.isNotEmpty() && sizeValue.isNotEmpty() && color.isNotEmpty()) {
+            sku =
+                "SKU-${sizeType.take(3)}-${sizeValue}-${color.take(3).uppercase()}-${System.currentTimeMillis() % 9999}"
+        }
+    }
 
-        Text("Agregar variante", style = MaterialTheme.typography.headlineSmall)
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+
+        Text(
+            if (variantId == null) "Agregar variante" else "Editar variante",
+            style = MaterialTheme.typography.headlineSmall
+        )
+
         Spacer(Modifier.height(16.dp))
 
-        // ======================
-        // TIPO DE TALLA
-        // ======================
         DropdownMenuBox(
             label = "Tipo de talla",
             items = listOf("EU", "LETTER"),
-            selectedIndex = if (sizeType.isBlank()) -1 else listOf("EU", "LETTER").indexOf(sizeType),
-            onSelect = { idx ->
-                sizeType = listOf("EU", "LETTER")[idx]
+            selectedIndex = if (sizeType == "") -1 else listOf("EU", "LETTER").indexOf(sizeType),
+            onSelect = {
+                sizeType = listOf("EU", "LETTER")[it]
                 selectedSizeIndex = -1
                 sizeValue = ""
                 generateSku()
             }
         )
 
-        // ======================
-        // TALLA
-        // ======================
         if (sizeType.isNotEmpty()) {
             val list = if (sizeType == "EU") euSizes else letterSizes
-
             DropdownMenuBox(
                 label = "Talla",
                 items = list,
@@ -80,9 +96,6 @@ fun CreateVariantScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ======================
-        // COLOR
-        // ======================
         OutlinedTextField(
             value = color,
             onValueChange = {
@@ -95,57 +108,34 @@ fun CreateVariantScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // ======================
-        // STOCK
-        // ======================
         OutlinedTextField(
             value = stock,
             onValueChange = {
-                stock = it.filter { c -> c.isDigit() }      // Solo números
-                stockError = validateStock(stock)           // Validación en vivo
+                stock = it.filter { c -> c.isDigit() }
+                stockError = validateStock(stock)
             },
-            label = { Text("Stock inicial") },
+            label = { Text("Stock") },
             isError = stockError != null,
-            singleLine = true,
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (stockError != null) {
-            Text(
-                text = stockError ?: "",
-                color = MaterialTheme.colorScheme.error,
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-
         Spacer(Modifier.height(12.dp))
 
-        // ======================
-        // SKU AUTO
-        // ======================
         OutlinedTextField(
             value = sku,
             onValueChange = {},
             enabled = false,
-            label = { Text("SKU (auto)") },
+            label = { Text("SKU") },
             modifier = Modifier.fillMaxWidth()
         )
 
         Spacer(Modifier.height(24.dp))
 
-        // ======================
-        // BOTÓN CREAR
-        // ======================
         Button(
             onClick = {
 
-                // Validaciones básicas
-                if (sizeType.isBlank() ||
-                    sizeValue.isBlank() ||
-                    color.isBlank()
-                ) return@Button
+                if (sizeType.isBlank() || sizeValue.isBlank() || color.isBlank()) return@Button
 
-                // Validar stock
                 val err = validateStock(stock)
                 if (err != null) {
                     stockError = err
@@ -159,14 +149,19 @@ fun CreateVariantScreen(
                     color = color,
                     sku = sku,
                     priceOverride = null,
-                    stock = stock.toInt()      // Ahora seguro es válido
+                    stock = stock.toInt()
                 )
 
-                vm.createVariant(req) { onNext() }
+                if (variantId == null) {
+                    vm.createVariant(req) { onNext() }
+                } else {
+                    vm.updateVariant(variantId!!, req) {}
+                    onNext()
+                }
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Crear variante")
+            Text(if (variantId == null) "Crear variante" else "Guardar cambios")
         }
     }
 }

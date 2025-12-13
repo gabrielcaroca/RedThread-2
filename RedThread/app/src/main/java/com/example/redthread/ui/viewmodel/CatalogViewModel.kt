@@ -40,6 +40,35 @@ class CatalogViewModel(
     private val _currentProduct = MutableStateFlow<ProductDto?>(null)
     val currentProduct: StateFlow<ProductDto?> = _currentProduct
 
+    private val _currentVariant = MutableStateFlow<VariantDto?>(null)
+    val currentVariant: StateFlow<VariantDto?> = _currentVariant
+
+    private val _variants = MutableStateFlow<List<VariantDto>>(emptyList())
+    val variants: StateFlow<List<VariantDto>> = _variants
+
+
+
+
+    fun loadVariantsByProduct(productId: Int) {
+        viewModelScope.launch {
+            try {
+                _variants.value = repo.getVariantsByProduct(productId)
+            } catch (e: Exception) {
+                _variants.value = emptyList()
+            }
+        }
+    }
+
+
+
+    fun loadVariant(variantId: Long) {
+        viewModelScope.launch {
+            safeCall(
+                action = { repo.getVariant(variantId) },
+                onSuccess = { v -> _currentVariant.value = v }
+            )
+        }
+    }
 
     // ===========================
     // LISTAR PRODUCTOS
@@ -94,17 +123,32 @@ class CatalogViewModel(
         onDone: (Int) -> Unit
     ) {
         viewModelScope.launch {
-            try {
-                _loading.value = true
-                val updated = repo.updateProduct(id, req)
-                onDone(updated.id)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            } finally {
-                _loading.value = false
-            }
+            safeCall(
+                action = { repo.updateProduct(id, req) },
+                onSuccess = { updatedDto ->
+                    onDone(updatedDto.id)
+                }
+            )
         }
     }
+
+    // ===========================
+// ACTUALIZAR VARIANTE
+// ===========================
+    fun updateVariant(
+        variantId: Long,
+        req: CreateVariantRequest,
+        onDone: () -> Unit
+    ) {
+        viewModelScope.launch {
+            safeCall(
+                action = { repo.updateVariant(variantId, req) },
+                onSuccess = { onDone() }
+            )
+        }
+    }
+
+
 
     // ===========================
     // CREAR PRODUCTO

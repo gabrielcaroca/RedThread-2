@@ -18,9 +18,21 @@ sealed class Route(val path: String) {
     data object CrearProducto : Route("crear-producto")
     data object CrearVariante : Route("crear-variante/{productId}")
     data object SubirImagen : Route("subir-imagen/{productId}")
-    data object EditVariant : Route("admin/variant/edit/{productId}/{variantId}")
-    data object EditarProducto : Route("editar-producto/{productId}")
 
+    data object EditVariant : Route("editar-variant/{productId}/{variantId}") {
+        fun create(productId: Int, variantId: Long) =
+            "editar-variant/$productId/$variantId"
+    }
+
+
+    data object EditarVariantes : Route("editar-variantes/{productId}") {
+        fun create(productId: Int) = "editar-variantes/$productId"
+    }
+
+
+    data object EditarProducto : Route("editar-producto/{productId}") {
+        fun createRoute(productId: Int) = "editar-producto/$productId"
+    }
 
 
 

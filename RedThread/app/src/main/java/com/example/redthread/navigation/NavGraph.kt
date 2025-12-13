@@ -139,6 +139,28 @@ fun AppNavGraph(
             }
 
 
+            composable(
+                route = Route.EditarVariantes.path,
+                arguments = listOf(
+                    navArgument("productId") { type = NavType.IntType }
+                )
+            ) { backStack ->
+
+                val productId = backStack.arguments?.getInt("productId") ?: 0
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                EditVariantsScreen(
+                    productId = productId,
+                    vm = vm,
+                    navController = navController
+                )
+            }
+
+
             // PERFIL
             composable(Route.Perfil.path) {
                 if (!header.isLoggedIn) {
@@ -224,13 +246,15 @@ fun AppNavGraph(
                 DeveloperScreen(
                     vm = devVm,
                     catalogVm = catalogVm,
+                    navController = navController,   // ← AHORA ES REQUERIDO
                     onCreateProduct = {
                         navController.navigate(Route.CrearProducto.path)
                     },
                     onEditProduct = { productId ->
-                        navController.navigate("editar-producto/$productId")
+                        navController.navigate(Route.EditarProducto.createRoute(productId))
                     }
                 )
+
             }
 
 
@@ -274,6 +298,37 @@ fun AppNavGraph(
                     navController = navController
                 )
             }
+
+            composable(
+                route = Route.EditVariant.path,
+                arguments = listOf(
+                    navArgument("productId") { type = NavType.IntType },
+                    navArgument("variantId") { type = NavType.LongType }
+                )
+            ) { backStack ->
+
+                val productId = backStack.arguments?.getInt("productId") ?: 0
+                val variantId = backStack.arguments?.getLong("variantId") ?: 0L
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                CreateVariantScreen(
+                    productId = productId,
+                    variantId = variantId,
+                    vm = vm,
+                    onNext = {
+                        navController.navigate(Route.VistaModerador.path) {
+                            popUpTo(Route.VistaModerador.path) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+
 
 
             // DETALLE PRODUCTO
@@ -327,27 +382,37 @@ fun AppNavGraph(
             }
 
 
-            // EDITAR PRODUCTO — FINAL LIMPIO Y CORRECTO
+            // ... dentro del NavHost ...
+
+// EDITAR PRODUCTO
             composable(
-                "editar-producto/{productId}",
+                route = Route.EditarProducto.path, // Usamos la constante: "editar-producto/{productId}"
                 arguments = listOf(navArgument("productId") { type = NavType.IntType })
             ) { backStack ->
 
+                // Recuperamos el ID de forma segura
                 val id = backStack.arguments?.getInt("productId") ?: 0
 
                 val app = LocalContext.current.applicationContext as Application
                 val repo = CatalogRepository(ApiClient.catalog)
                 val factory = CatalogVmFactory(app, repo)
+                // Creamos un ViewModel fresco para esta pantalla de edición
                 val vm: CatalogViewModel = viewModel(factory = factory)
 
                 CreateProductScreen(
                     vm = vm,
                     productId = id,
                     onNext = {
-                        navController.popBackStack()   // ✔️ ESTA ES LA BUENA
+                        navController.navigate(Route.VistaModerador.path) {
+                            popUpTo(Route.VistaModerador.path) { inclusive = true }
+                            launchSingleTop = true
+                        }
                     }
+
                 )
             }
+
+
 
 
             // CREAR VARIANTE
@@ -371,6 +436,40 @@ fun AppNavGraph(
                     }
                 )
             }
+
+            composable(
+                route = Route.EditVariant.path,
+                arguments = listOf(
+                    navArgument("productId") { type = NavType.IntType },
+                    navArgument("variantId") { type = NavType.LongType }
+
+                )
+            ) { backStack ->
+
+                val productId = backStack.arguments?.getInt("productId") ?: 0
+                val variantId = backStack.arguments?.getLong("variantId") ?: 0L
+
+
+
+                val app = LocalContext.current.applicationContext as Application
+                val repo = CatalogRepository(ApiClient.catalog)
+                val factory = CatalogVmFactory(app, repo)
+                val vm: CatalogViewModel = viewModel(factory = factory)
+
+                CreateVariantScreen(
+                    productId = productId,
+                    vm = vm,
+                    variantId = variantId,
+                    onNext = {
+                        navController.navigate(Route.VistaModerador.path) {
+                            popUpTo(Route.VistaModerador.path) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                )
+            }
+
+
 
 
             // SUBIR IMAGEN
