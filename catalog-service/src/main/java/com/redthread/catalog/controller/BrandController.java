@@ -30,8 +30,7 @@ public class BrandController {
     @PostMapping
     @Operation(summary = "Crear marca")
     @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Marca creada",
-                    content = @Content(schema = @Schema(implementation = Brand.class))),
+            @ApiResponse(responseCode = "201", description = "Marca creada", content = @Content(schema = @Schema(implementation = Brand.class))),
             @ApiResponse(responseCode = "400", description = "Datos inválidos"),
             @ApiResponse(responseCode = "409", description = "Marca duplicada")
     })
@@ -41,11 +40,11 @@ public class BrandController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener marca por id")
+    @Operation(summary = "Obtener marca por ID")
     @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Marca encontrada",
-                    content = @Content(schema = @Schema(implementation = Brand.class))),
-            @ApiResponse(responseCode = "404", description = "Marca no existe")
+            @ApiResponse(responseCode = "200", description = "Marca encontrada", content = @Content(schema = @Schema(implementation = Brand.class))),
+            @ApiResponse(responseCode = "404", description = "Marca no existe"),
+            @ApiResponse(responseCode = "500", description = "Error interno")
     })
     public Brand get(@Parameter(description = "ID de marca") @PathVariable Long id) {
         return service.get(id);
@@ -53,6 +52,10 @@ public class BrandController {
 
     @GetMapping
     @Operation(summary = "Listar marcas")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Listado de marcas"),
+            @ApiResponse(responseCode = "500", description = "Error interno")
+    })
     public List<Brand> list() {
         return service.getAll();
     }

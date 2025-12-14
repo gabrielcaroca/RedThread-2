@@ -20,37 +20,29 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "Inventory", description = "Stock disponible/reservado por variante")
 public class InventoryController {
 
-    private final InventoryService service;
+        private final InventoryService service;
 
-    @GetMapping("/by-variant/{variantId}")
-    @Operation(
-            summary = "Obtener inventario por variante",
-            description = "Retorna el inventario asociado a una variante."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Inventario encontrado",
-                    content = @Content(schema = @Schema(implementation = Inventory.class))),
-            @ApiResponse(responseCode = "404", description = "Variante no existe / sin inventario")
-    })
-    public Inventory byVariant(
-            @Parameter(description = "ID de la variante", example = "5")
-            @PathVariable Long variantId
-    ) {
-        return service.getByVariant(variantId);
-    }
+        @GetMapping("/by-variant/{variantId}")
+        @Operation(summary = "Obtener inventario por variante", description = "Retorna el inventario asociado a una variante.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Inventario encontrado", content = @Content(schema = @Schema(implementation = Inventory.class))),
+                        @ApiResponse(responseCode = "404", description = "Variante no existe o no tiene inventario"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
+        public Inventory byVariant(
+                        @Parameter(description = "ID de la variante", example = "5") @PathVariable Long variantId) {
+                return service.getByVariant(variantId);
+        }
 
-    @PostMapping("/adjust")
-    @Operation(
-            summary = "Ajustar stock disponible",
-            description = "Aplica un delta (positivo o negativo) al stockAvailable de la variante."
-    )
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Stock ajustado",
-                    content = @Content(schema = @Schema(implementation = Inventory.class))),
-            @ApiResponse(responseCode = "400", description = "Delta inválido"),
-            @ApiResponse(responseCode = "404", description = "Variante no existe")
-    })
-    public Inventory adjust(@RequestBody @Valid AdjustStockReq req) {
-        return service.adjustStock(req.variantId(), req.delta());
-    }
+        @PostMapping("/adjust")
+        @Operation(summary = "Ajustar stock disponible", description = "Aplica un delta (positivo o negativo) al stockAvailable de la variante.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Stock ajustado correctamente", content = @Content(schema = @Schema(implementation = Inventory.class))),
+                        @ApiResponse(responseCode = "400", description = "Delta inválido o stock resultante negativo"),
+                        @ApiResponse(responseCode = "404", description = "Variante no existe"),
+                        @ApiResponse(responseCode = "500", description = "Error interno al ajustar stock")
+        })
+        public Inventory adjust(@RequestBody @Valid AdjustStockReq req) {
+                return service.adjustStock(req.variantId(), req.delta());
+        }
 }

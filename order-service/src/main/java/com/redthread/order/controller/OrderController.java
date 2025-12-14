@@ -27,7 +27,11 @@ public class OrderController {
 
         // -------------------------------------------------------
         @Operation(summary = "Listar órdenes del usuario")
-        @ApiResponse(responseCode = "200", description = "Órdenes obtenidas")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Órdenes obtenidas"),
+                        @ApiResponse(responseCode = "401", description = "No autenticado"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
         @GetMapping
         public List<OrderRes> list() {
                 return orderService.listByUser(auth.currentUserId())
@@ -154,7 +158,5 @@ public class OrderController {
         public AdminOrderDetailRes adminDetail(@PathVariable Long id) {
                 return orderService.getAdminDetail(id);
         }
-
-        
 
 }

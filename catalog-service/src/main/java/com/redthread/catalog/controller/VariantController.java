@@ -34,13 +34,14 @@ public class VariantController {
 
         @PostMapping
         @Operation(summary = "Crear variante", description = "Crea una variante asociada a un producto. "
-                        + "Si no se envía sku, se genera automáticamente. "
-                        + "Crea inventario con stock inicial (stock).")
+                        + "Si no se envía SKU, se genera automáticamente. "
+                        + "Crea inventario con stock inicial.")
         @ApiResponses({
-                        @ApiResponse(responseCode = "201", description = "Variante creada", content = @Content(schema = @Schema(implementation = VariantDto.class))),
-                        @ApiResponse(responseCode = "400", description = "Datos inválidos / talla inválida"),
+                        @ApiResponse(responseCode = "201", description = "Variante creada correctamente", content = @Content(schema = @Schema(implementation = VariantDto.class))),
+                        @ApiResponse(responseCode = "400", description = "Datos inválidos o talla inválida"),
                         @ApiResponse(responseCode = "404", description = "Producto no existe"),
-                        @ApiResponse(responseCode = "409", description = "Variante duplicada")
+                        @ApiResponse(responseCode = "409", description = "Variante duplicada o SKU en uso"),
+                        @ApiResponse(responseCode = "500", description = "Error interno al crear variante")
         })
         public ResponseEntity<VariantDto> create(@RequestBody @Valid CreateVariantReq req) {
 
@@ -51,10 +52,11 @@ public class VariantController {
         }
 
         @GetMapping("/{id}")
-        @Operation(summary = "Obtener variante por id")
+        @Operation(summary = "Obtener variante por ID")
         @ApiResponses({
-                        @ApiResponse(responseCode = "200", description = "Variante encontrada", content = @Content(schema = @Schema(implementation = Variant.class))),
-                        @ApiResponse(responseCode = "404", description = "Variante no existe")
+                        @ApiResponse(responseCode = "200", description = "Variante encontrada", content = @Content(schema = @Schema(implementation = VariantDto.class))),
+                        @ApiResponse(responseCode = "404", description = "Variante no existe"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
         })
         public Variant get(@Parameter(description = "ID de la variante") @PathVariable Long id) {
                 return service.get(id);
@@ -63,7 +65,9 @@ public class VariantController {
         @GetMapping
         @Operation(summary = "Listar variantes por producto")
         @ApiResponses({
-                        @ApiResponse(responseCode = "200", description = "Listado de variantes")
+                        @ApiResponse(responseCode = "200", description = "Listado de variantes"),
+                        @ApiResponse(responseCode = "404", description = "Producto no existe"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
         })
         public List<Variant> list(
                         @Parameter(description = "ID del producto padre") @RequestParam Long productId) {
@@ -72,6 +76,10 @@ public class VariantController {
 
         @GetMapping("/todos")
         @Operation(summary = "Listar todas las variantes (debug)")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Listado completo de variantes"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
         public List<Variant> all() {
                 return repo.findAll();
         }
@@ -79,10 +87,11 @@ public class VariantController {
         @PutMapping("/{id}")
         @Operation(summary = "Actualizar variante")
         @ApiResponses({
-                        @ApiResponse(responseCode = "200", description = "Variante actualizada", content = @Content(schema = @Schema(implementation = VariantDto.class))),
+                        @ApiResponse(responseCode = "200", description = "Variante actualizada correctamente", content = @Content(schema = @Schema(implementation = VariantDto.class))),
                         @ApiResponse(responseCode = "400", description = "Datos inválidos"),
                         @ApiResponse(responseCode = "404", description = "Variante o producto no existe"),
-                        @ApiResponse(responseCode = "409", description = "Conflicto de combinación o SKU")
+                        @ApiResponse(responseCode = "409", description = "Conflicto de combinación o SKU"),
+                        @ApiResponse(responseCode = "500", description = "Error interno al actualizar variante")
         })
         public VariantDto update(
                         @Parameter(description = "ID de la variante") @PathVariable Long id,

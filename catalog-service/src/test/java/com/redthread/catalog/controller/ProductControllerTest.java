@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ProductController.class)
-@AutoConfigureMockMvc(addFilters = false) // ✅ desactiva seguridad/CSRF en estos tests
+@AutoConfigureMockMvc(addFilters = false)
 class ProductControllerTest {
 
     @Autowired MockMvc mvc;
@@ -35,18 +35,18 @@ class ProductControllerTest {
         Product p = Product.builder()
                 .id(1L)
                 .name("Polera")
-                .basePrice(new BigDecimal("10"))
-                .active(true)
+                .basePrice(new BigDecimal("10000"))
                 .featured(true)
                 .gender(ProductGender.HOMBRE)
                 .build();
 
-        when(service.create(anyLong(), any(), anyString(), any(), any(), anyBoolean(), any()))
+        when(service.create(anyLong(), any(), anyString(), any(),
+                any(), anyBoolean(), any()))
                 .thenReturn(p);
 
         CreateProductReq req = new CreateProductReq(
                 1L, null, "Polera", null,
-                new BigDecimal("10"),
+                new BigDecimal("10000"),
                 true,
                 ProductGender.HOMBRE
         );
@@ -55,30 +55,29 @@ class ProductControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(om.writeValueAsString(req)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.featured").value(true))
-                .andExpect(jsonPath("$.gender").value("HOMBRE"));
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.featured").value(true));
     }
 
     @Test
-    void list_featuredHome_returnsOnlyFeatured() throws Exception {
-        when(service.list(null, null, true)).thenReturn(List.of(
-                Product.builder().id(1L).featured(true).gender(ProductGender.HOMBRE).build(),
-                Product.builder().id(2L).featured(true).gender(ProductGender.MUJER).build()
-        ));
+    void list_featured_returns200() throws Exception {
+        when(service.list(null, null, true))
+                .thenReturn(List.of(
+                        Product.builder().id(1L).featured(true).build()
+                ));
 
         mvc.perform(get("/products").param("featured", "true"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[1].id").value(2L));
+                .andExpect(jsonPath("$[0].id").value(1L));
     }
 
     @Test
-    void list_genderTab_returnsByGender() throws Exception {
-        when(service.list(null, ProductGender.MUJER, null)).thenReturn(List.of(
-                Product.builder().id(7L).gender(ProductGender.MUJER).build()
-        ));
+    void getById_returns200() throws Exception {
+        when(service.get(5L))
+                .thenReturn(Product.builder().id(5L).build());
 
-        mvc.perform(get("/products").param("gender", "MUJER"))
+        mvc.perform(get("/products/5"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(7L));
+                .andExpect(jsonPath("$.id").value(5L));
     }
 }

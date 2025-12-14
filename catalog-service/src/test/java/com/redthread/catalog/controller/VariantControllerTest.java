@@ -39,20 +39,15 @@ class VariantControllerTest {
                 .id(5L)
                 .product(Product.builder().id(10L).build())
                 .sizeType(SizeType.LETTER)
-                .sku("SKU-1")
-                .color("NEGRO")
                 .sizeValue("M")
+                .color("NEGRO")
+                .sku("SKU-1")
                 .build();
 
         when(service.create(any(CreateVariantReq.class))).thenReturn(v);
 
         CreateVariantReq req = new CreateVariantReq(
-                10L,
-                SizeType.LETTER,
-                "M",
-                "NEGRO",
-                null,
-                2
+                10L, SizeType.LETTER, "M", "NEGRO", null, 2
         );
 
         mvc.perform(post("/variants")
@@ -62,11 +57,12 @@ class VariantControllerTest {
     }
 
     @Test
-    void list_byProduct_returnsList() throws Exception {
-        when(service.byProduct(10L)).thenReturn(List.of(
-                Variant.builder().id(1L).build(),
-                Variant.builder().id(2L).build()
-        ));
+    void list_byProduct_returns200() throws Exception {
+        when(service.byProduct(10L))
+                .thenReturn(List.of(
+                        Variant.builder().id(1L).build(),
+                        Variant.builder().id(2L).build()
+                ));
 
         mvc.perform(get("/variants").param("productId", "10"))
                 .andExpect(status().isOk())

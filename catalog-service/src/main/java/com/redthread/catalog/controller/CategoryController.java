@@ -24,58 +24,56 @@ import java.util.List;
 @Tag(name = "Categories", description = "Gestión de categorías del catálogo")
 public class CategoryController {
 
-    private final CategoryService service;
+        private final CategoryService service;
 
-    @PostMapping
-    @Operation(summary = "Crear categoría", description = "Crea una nueva categoría. El nombre es único.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "201", description = "Categoría creada",
-                    content = @Content(schema = @Schema(implementation = Category.class))),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
-            @ApiResponse(responseCode = "409", description = "Categoría duplicada")
-    })
-    public ResponseEntity<Category> create(@RequestBody @Valid CreateCategoryReq req) {
-        Category created = service.create(req.name(), req.description());
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
-    }
+        @PostMapping
+        @Operation(summary = "Crear categoría", description = "Crea una nueva categoría. El nombre es único.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "201", description = "Categoría creada", content = @Content(schema = @Schema(implementation = Category.class))),
+                        @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+                        @ApiResponse(responseCode = "409", description = "Categoría duplicada"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
+        public ResponseEntity<Category> create(@RequestBody @Valid CreateCategoryReq req) {
+                Category created = service.create(req.name(), req.description());
+                return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        }
 
-    @GetMapping
-    @Operation(summary = "Listar categorías", description = "Obtiene todas las categorías.")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Listado de categorías")
-    })
-    public List<Category> list() {
-        return service.getAll();
-    }
+        @GetMapping
+        @Operation(summary = "Listar categorías", description = "Obtiene todas las categorías.")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Listado de categorías"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
+        public List<Category> list() {
+                return service.getAll();
+        }
 
-    @GetMapping("/{id}")
-    @Operation(summary = "Obtener categoría por ID")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Categoría encontrada",
-                    content = @Content(schema = @Schema(implementation = Category.class))),
-            @ApiResponse(responseCode = "404", description = "Categoría no existe")
-    })
-    public Category get(
-            @Parameter(description = "ID de la categoría", example = "1")
-            @PathVariable Long id
-    ) {
-        return service.get(id);
-    }
+        @GetMapping("/{id}")
+        @Operation(summary = "Obtener categoría por ID")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Categoría encontrada", content = @Content(schema = @Schema(implementation = Category.class))),
+                        @ApiResponse(responseCode = "404", description = "Categoría no existe"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
+        public Category get(
+                        @Parameter(description = "ID de la categoría", example = "1") @PathVariable Long id) {
+                return service.get(id);
+        }
 
-    @PutMapping("/{id}")
-    @Operation(summary = "Actualizar categoría")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Categoría actualizada",
-                    content = @Content(schema = @Schema(implementation = Category.class))),
-            @ApiResponse(responseCode = "400", description = "Datos inválidos"),
-            @ApiResponse(responseCode = "404", description = "Categoría no existe"),
-            @ApiResponse(responseCode = "409", description = "Nombre duplicado")
-    })
-    public Category update(
-            @Parameter(description = "ID de la categoría", example = "1")
-            @PathVariable Long id,
-            @RequestBody @Valid CreateCategoryReq req
-    ) {
-        return service.update(id, req.name(), req.description());
-    }
+        @PutMapping("/{id}")
+        @Operation(summary = "Actualizar categoría")
+        @ApiResponses({
+                        @ApiResponse(responseCode = "200", description = "Categoría actualizada", content = @Content(schema = @Schema(implementation = Category.class))),
+                        @ApiResponse(responseCode = "400", description = "Datos inválidos"),
+                        @ApiResponse(responseCode = "404", description = "Categoría no existe"),
+                        @ApiResponse(responseCode = "409", description = "Nombre duplicado"),
+                        @ApiResponse(responseCode = "500", description = "Error interno")
+        })
+        public Category update(
+                        @Parameter(description = "ID de la categoría", example = "1") @PathVariable Long id,
+                        @RequestBody @Valid CreateCategoryReq req) {
+                return service.update(id, req.name(), req.description());
+        }
+
 }
