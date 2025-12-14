@@ -8,6 +8,10 @@ import com.redthread.order.integrations.CatalogClient;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import com.redthread.order.dto.AdminOrderDetailRes;
+import com.redthread.order.dto.AdminOrderItemRes;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.http.HttpStatus;
 
 import java.util.List;
 
@@ -38,15 +42,16 @@ public class OrderService {
    * Enum OrderStatus: {CREATED, PAID, CANCELLED, SHIPPED}
    * Mapeo:
    * - DELIVERED -> SHIPPED
-   * - FAILED    -> CANCELLED
-   * - otros     -> no cambia nada
+   * - FAILED -> CANCELLED
+   * - otros -> no cambia nada
    */
   @Transactional
   public void updateDeliveryStatusInternal(Long orderId, String deliveryStatus, String note) {
     Order order = orderRepo.findById(orderId)
         .orElseThrow(() -> new IllegalArgumentException("Order no encontrada"));
 
-    if (deliveryStatus == null) return;
+    if (deliveryStatus == null)
+      return;
 
     String s = deliveryStatus.trim().toUpperCase();
 
@@ -84,10 +89,53 @@ public class OrderService {
     return orderRepo.save(order);
   }
 
+  public AdminOrderDetailRes getAdminDetail(Long orderId) {
+
+    Order order = orderRepo.findById(orderId)
+        .orElseThrow(() -> new ResponseStatusException(
+            HttpStatus.NOT_FOUND, "Orden no encontrada"));
+
+    // cargar items
+    var items = itemRepo.findByOrderId(order.getId());
+    order.setItems(items);
+
+    // dirección
+    Address a = order.getAddress();
+    String fullAddress = a.getLine1() + ", " + a.getCity() + ", " + a.getCountry();
+
+    // items enriquecidos (catalog-service)
+    List<AdminOrderItemRes> adminItems = items.stream()
+        .map(i -> {
+            var variant = catalog.getVariantAdmin(i.getVariantId());
+
+            return new AdminOrderItemRes(
+                i.getVariantId(),
+                variant.productName(),
+                variant.size(),
+                variant.color(),
+                i.getQuantity(),
+                i.getUnitPrice(),
+                i.getLineTotal()
+            );
+        })
+        .toList();
+
+    return new AdminOrderDetailRes(
+        order.getId(),
+        order.getStatus().name(),
+        order.getUserId(),
+        fullAddress,
+        order.getTotalAmount(),
+        adminItems
+    );
+}
+
+
   @Transactional
   public Order cancel(String userId, Long orderId) {
     Order order = getByIdForUser(orderId, userId);
-    if (order.getStatus() == OrderStatus.CANCELLED) return order;
+    if (order.getStatus() == OrderStatus.CANCELLED)
+      return order;
     if (order.getStatus() != OrderStatus.CREATED && order.getStatus() != OrderStatus.PAID)
       throw new IllegalStateException("Solo CREATED o PAID se pueden cancelar");
 

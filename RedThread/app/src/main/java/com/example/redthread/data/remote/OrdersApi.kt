@@ -1,5 +1,7 @@
 package com.example.redthread.data.remote
 
+import com.example.redthread.data.remote.dto.AdminOrderDetailRes
+import com.example.redthread.data.remote.dto.OrderDetailDto
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
@@ -31,6 +33,12 @@ interface OrdersApi {
     @DELETE("cart/clear")
     suspend fun clearCart()
 
+
+    @GET("orders/admin/{id}")
+    suspend fun getAdminOrderDetail(
+        @Path("id") id: Long
+    ): AdminOrderDetailRes
+
     // ===== CHECKOUT =====
 
     @POST("checkout")
@@ -43,4 +51,9 @@ interface OrdersApi {
 
     @GET("orders/{id}")
     suspend fun orderDetail(@Path("id") id: Long): OrderRes
+
+    @GET("orders/{id}")
+    suspend fun getOrderDetail(
+        @Path("id") id: Long
+    ): OrderDetailDto
 }

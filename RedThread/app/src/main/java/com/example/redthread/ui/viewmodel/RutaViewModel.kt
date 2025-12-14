@@ -46,6 +46,18 @@ class RutaViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun crearRutaConPedidos(pedidos: List<Long>) {
+        if (pedidos.isEmpty()) return
+
+        val nombreRuta = "Ruta ${System.currentTimeMillis()}"
+
+        crearRuta(
+            nombre = nombreRuta,
+            pedidosSeleccionados = pedidos
+        )
+    }
+
+
     fun actualizarRuta(ruta: RutaEntity) {
         viewModelScope.launch { dao.update(ruta) }
     }

@@ -195,6 +195,49 @@ fun AppNavGraph(
             }
 
 
+            composable(
+                route = "admin-pedido/{id}",
+                arguments = listOf(navArgument("id") { type = NavType.LongType })
+            ) { backStack ->
+                val id = backStack.arguments!!.getLong("id")
+
+                val factory = remember {
+                    AdminPedidoDetalleVmFactory(ApiClient.orders)
+                }
+
+                val vm: AdminPedidoDetalleViewModel =
+                    viewModel(factory = factory)
+
+                AdminPedidoDetalleScreen(
+                    orderId = id,
+                    vm = vm,
+                    onBack = { navController.popBackStack() }
+                )
+
+            }
+
+            composable(
+                route = Route.AdminPedidoDetalle.path,
+                arguments = listOf(navArgument("id") { type = NavType.LongType })
+            ) { backStack ->
+
+                val id = backStack.arguments!!.getLong("id")
+
+                val factory = remember {
+                    AdminPedidoDetalleVmFactory(ApiClient.orders)
+                }
+
+                val vm: AdminPedidoDetalleViewModel =
+                    viewModel(factory = factory)
+
+                AdminPedidoDetalleScreen(
+                    orderId = id,
+                    vm = vm,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+
             // CHECKOUT
             composable(Route.Checkout.path) {
                 CheckoutScreen(

@@ -5,7 +5,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.redthread.data.local.database.AppDatabase
 import com.example.redthread.data.local.pedido.PedidoEntity
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -14,6 +16,8 @@ class PedidoViewModel(app: Application) : AndroidViewModel(app) {
 
     val pedidos = dao.observarTodos()
         .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+
 
     fun createPedido(
         usuario: String,

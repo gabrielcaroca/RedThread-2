@@ -6,6 +6,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+
+import com.redthread.order.dto.VariantAdminInfo;
+
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
@@ -112,6 +115,35 @@ public class CatalogClient {
       return null;
     }
   }
+
+public VariantAdminInfo getVariantAdmin(Long variantId) {
+
+  String token = currentToken();
+
+  Map<String, Object> variant = catalogWebClient.get()
+      .uri("/variants/{id}", variantId)
+      .headers(h -> { if (token != null) h.setBearerAuth(token); })
+      .retrieve()
+      .bodyToMono(Map.class)
+      .block();
+
+  if (variant == null) return null;
+
+  Map<String, Object> product = catalogWebClient.get()
+      .uri("/products/{id}", variant.get("productId"))
+      .headers(h -> { if (token != null) h.setBearerAuth(token); })
+      .retrieve()
+      .bodyToMono(Map.class)
+      .block();
+
+  return new VariantAdminInfo(
+      variantId,
+      product.get("name").toString(),
+      variant.get("sizeValue").toString(),
+      variant.get("color").toString()
+  );
+}
+
 
   public void adjustStock(Long variantId, int delta) {
     String token = currentToken();

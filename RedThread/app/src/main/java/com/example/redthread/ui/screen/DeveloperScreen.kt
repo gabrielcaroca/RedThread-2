@@ -13,6 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import com.example.redthread.data.local.pedido.PedidoEntity
+import com.example.redthread.data.remote.ApiClient
+import com.example.redthread.data.remote.OrderRes
 import com.example.redthread.ui.viewmodel.DeveloperViewModel
 import com.example.redthread.ui.viewmodel.PedidoViewModel
 import com.example.redthread.ui.viewmodel.RutaViewModel
@@ -20,6 +23,8 @@ import com.example.redthread.ui.viewmodel.CatalogViewModel
 import com.example.redthread.data.remote.dto.ProductDto
 import com.example.redthread.data.remote.dto.VariantDto
 import com.example.redthread.navigation.Route
+import com.example.redthread.ui.viewmodel.AdminOrdersViewModel
+import com.example.redthread.ui.viewmodel.AdminOrdersVmFactory
 
 enum class DevTab { PRODUCTOS, PEDIDOS, RUTAS }
 
@@ -55,10 +60,14 @@ fun DeveloperScreen(
                 onEditProduct = onEditProduct
             )
 
-            DevTab.PEDIDOS -> OrdersTab(
-                vmPedido = viewModel(),
-                vmRuta = viewModel()
-            )
+            DevTab.PEDIDOS -> {
+                OrdersTab(
+                    navController = navController
+                )
+            }
+
+
+
 
             DevTab.RUTAS -> UsersTab(
                 vmRuta = viewModel()
@@ -196,27 +205,52 @@ fun ProductRowRemote(
 
 @Composable
 fun OrdersTab(
-    vmPedido: PedidoViewModel = viewModel(),
-    vmRuta: RutaViewModel = viewModel()
+    navController: NavHostController,
+    rutaVm: RutaViewModel = viewModel()
 ) {
-    val pedidos by vmPedido.pedidos.collectAsState()
-    val pendientes = pedidos.filter { it.estado == "pendiente" }
+    val factory = remember {
+        AdminOrdersVmFactory(ApiClient.orders)
+    }
 
-    val seleccionados = remember { mutableStateListOf<Long>() }
+    val vm: AdminOrdersViewModel = viewModel(factory = factory)
+
+    val orders by vm.orders.collectAsState()
+    val rutas by rutaVm.rutas.collectAsState()
+
+    // 👉 pedidos seleccionados
+    val selectedIds = remember { mutableStateListOf<Long>() }
+
+    // 👉 IDs de pedidos que YA están en alguna ruta
+    val usedIds = rutas
+        .flatMap { it.pedidosIds.split(",") }
+        .mapNotNull { it.toLongOrNull() }
+
+    // 👉 solo pedidos CREATED que NO estén usados
+    val pendientes = orders
+        .filter { it.status == "CREATED" }
+        .filterNot { usedIds.contains(it.id) }
+
+    LaunchedEffect(Unit) {
+        vm.loadOrders()
+    }
 
     Column(Modifier.padding(16.dp)) {
 
-        Text("Pedidos disponibles", fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(10.dp))
+        Text(
+            text = "Pedidos disponibles",
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(Modifier.height(12.dp))
 
         Button(
+            enabled = selectedIds.isNotEmpty(),
             onClick = {
-                if (seleccionados.isNotEmpty()) {
-                    val nombreRuta = "Ruta${System.currentTimeMillis() % 1000}"
-                    vmRuta.crearRuta(nombreRuta, seleccionados)
-                    seleccionados.forEach { vmPedido.actualizarEstadoPedido(it, "asignado") }
-                    seleccionados.clear()
-                }
+                rutaVm.crearRuta(
+                    nombre = "Ruta ${System.currentTimeMillis()}",
+                    pedidosSeleccionados = selectedIds.toList()
+                )
+                selectedIds.clear()
             }
         ) {
             Text("Crear ruta con seleccionados")
@@ -224,47 +258,123 @@ fun OrdersTab(
 
         Spacer(Modifier.height(16.dp))
 
-        if (pendientes.isEmpty()) {
-            Text("No hay pedidos registrados.")
-        } else {
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(pendientes) { p ->
-                    PedidoItem(
-                        pedido = p,
-                        seleccionado = seleccionados.contains(p.id),
-                        onSelect = { checked ->
-                            if (checked) seleccionados.add(p.id)
-                            else seleccionados.remove(p.id)
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(pendientes) { o ->
+                AdminOrderSelectableItem(
+                    order = o,
+                    selected = selectedIds.contains(o.id),
+                    onCheckedChange = { checked ->
+                        if (checked) {
+                            if (!selectedIds.contains(o.id)) {
+                                selectedIds.add(o.id)
+                            }
+                        } else {
+                            selectedIds.remove(o.id)
                         }
-                    )
-                }
+                    },
+                    onDetail = {
+                        navController.navigate("admin-pedido/${o.id}")
+                    }
+                )
             }
         }
     }
 }
+
+
+
+
+@Composable
+fun AdminOrderSelectableItem(
+    order: OrderRes,
+    selected: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onDetail: () -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = onCheckedChange
+                )
+
+                Column {
+                    Text(
+                        text = "Pedido #${order.id}",
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text("Total: $${order.totalAmount}")
+                }
+            }
+
+            Spacer(Modifier.height(6.dp))
+
+            TextButton(onClick = onDetail) {
+                Text("Ver detalle")
+            }
+        }
+    }
+}
+
+
+
+
+
+@Composable
+fun AdminOrderItem(
+    order: OrderRes,
+    onDetail: () -> Unit
+) {
+    Card(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+
+            Text("Pedido #${order.id}", fontWeight = FontWeight.Bold)
+            Text("Estado: ${order.status}")
+            Text("Total: $${order.totalAmount}")
+
+            Spacer(Modifier.height(8.dp))
+
+            TextButton(onClick = onDetail) {
+                Text("Ver detalle")
+            }
+        }
+    }
+}
+
 
 @Composable
 fun PedidoItem(
-    pedido: com.example.redthread.data.local.pedido.PedidoEntity,
+    pedido: PedidoEntity,
     seleccionado: Boolean,
-    onSelect: (Boolean) -> Unit
+    onSelect: (Boolean) -> Unit,
+    onVerDetalle: () -> Unit
 ) {
     Card(Modifier.fillMaxWidth()) {
-        Row(
-            Modifier.padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+        Column {
 
-            Checkbox(checked = seleccionado, onCheckedChange = onSelect)
+            Row(
+                Modifier.padding(10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Checkbox(checked = seleccionado, onCheckedChange = onSelect)
 
-            Column(Modifier.weight(1f)) {
-                Text(pedido.usuario, fontWeight = FontWeight.Bold)
-                Text(pedido.direccion)
-                Text("Total: $${pedido.total}")
+                Column(Modifier.weight(1f)) {
+                    Text(pedido.usuario, fontWeight = FontWeight.Bold)
+                    Text(pedido.direccion)
+                    Text("Total: $${pedido.total}")
+                }
+            }
+
+            TextButton(onClick = onVerDetalle) {
+                Text("Ver detalle")
             }
         }
     }
 }
+
 
 //////////////////////////////////////////////////////////////////
 // RUTAS

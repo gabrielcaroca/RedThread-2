@@ -34,6 +34,10 @@ sealed class Route(val path: String) {
         fun createRoute(productId: Int) = "editar-producto/$productId"
     }
 
+    data object AdminPedidoDetalle : Route("admin-pedido/{id}") {
+        fun create(id: Long) = "admin-pedido/$id"
+    }
+
 
 
     data object Forgot : Route("recuperar")
