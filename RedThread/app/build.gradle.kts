@@ -87,7 +87,6 @@ dependencies {
 
     // ===== DataStore (preferencias locales) =====
     implementation("androidx.datastore:datastore-preferences:1.1.1")
-
     // ===== Carga de imágenes =====
     implementation("io.coil-kt:coil-compose:2.7.0")
 
@@ -98,7 +97,6 @@ dependencies {
     implementation("com.google.android.material:material:1.12.0")
 
     // ===== Tests =====
-    testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.09.00"))
@@ -114,9 +112,7 @@ dependencies {
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // <-- NUEVO
 
     //librerias de Test Locales
-    testImplementation(libs.junit) //libreria junit
-    testImplementation("io.mockk:mockk:1.13.12") //Mock para kotlin
-    testImplementation("org.robolectric:robolectric:4.13") //simular pruebas en Android test locales
+     //libreria junit
     //test implementacion UI
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -128,5 +124,23 @@ dependencies {
     // GPS (Fused Location Provider)
     implementation("com.google.android.gms:play-services-location:21.3.0")
     implementation("io.coil-kt:coil-compose:2.5.0")
+
+    // ===== Tests JVM =====
+    testImplementation("junit:junit:4.13.2")
+
+// Coroutines test (OBLIGATORIO)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+
+// ViewModelScope en tests
+    testImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
+
+// Mockito
+    testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+
+// Flow testing
+    testImplementation("app.cash.turbine:turbine:1.1.0")
+
+
 
 }
