@@ -5,6 +5,8 @@ import com.redthread.order.model.Address;
 import com.redthread.order.model.Order;
 import com.redthread.order.security.JwtUserResolver;
 import com.redthread.order.service.OrderService;
+
+import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -102,6 +104,7 @@ public class OrderController {
 
         // -------------------------------------------------------
         @Operation(summary = "Actualizar estado de delivery-service → order-service")
+        @Hidden
         @PostMapping("/{id}/delivery-status")
         public void deliveryStatus(
                         @PathVariable Long id,
@@ -150,6 +153,7 @@ public class OrderController {
         }
 
         @Operation(summary = "Detalle de orden (ADMIN)")
+        @Hidden  
         @ApiResponses({
                         @ApiResponse(responseCode = "200", description = "Detalle de orden para admin"),
                         @ApiResponse(responseCode = "404", description = "Orden no encontrada")

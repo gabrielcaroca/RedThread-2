@@ -34,9 +34,7 @@ public class CheckoutController {
           content = @Content(schema = @Schema(implementation = OrderRes.class))),
       @ApiResponse(responseCode = "400", description = "Carrito o dirección no existe"),
       @ApiResponse(responseCode = "409", description = "Carrito vacío o sin stock"),
-      @ApiResponse(responseCode = "401", description = "No autenticado"),
-      @ApiResponse(responseCode = "500", description = "Error interno al procesar checkout")
-
+      @ApiResponse(responseCode = "401", description = "No autenticado")
   })
   @PostMapping("/checkout")
   public OrderRes checkout(@Valid @RequestBody CheckoutReq req) {

@@ -37,38 +37,42 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors(Customizer.withDefaults())
-            .csrf(csrf -> csrf.disable())
+                .cors(Customizer.withDefaults())
+                .csrf(csrf -> csrf.disable())
 
-            // ============================
-            // Resource Server (JWT)
-            // ============================
-            .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
+                // ============================
+                // Resource Server (JWT)
+                // ============================
+                .oauth2ResourceServer(oauth -> oauth.jwt(Customizer.withDefaults()))
 
-            // ============================
-            // Authorization Rules
-            // ============================
-            .authorizeHttpRequests(auth -> auth
+                // ============================
+                // Authorization Rules
+                // ============================
+                .authorizeHttpRequests(auth -> auth
 
-                // ----------- RUTAS PÚBLICAS -----------
-                // imágenes
-                .requestMatchers("/media/**").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**")
+                        .permitAll()
+                        // ----------- RUTAS PÚBLICAS -----------
+                        // imágenes
+                        .requestMatchers("/media/**").permitAll()
 
-                // catálogo público
-                .requestMatchers("/products/**").permitAll()
-                .requestMatchers("/categories/**").permitAll()
-                .requestMatchers("/brands/**").permitAll()
+                        // catálogo público
+                        .requestMatchers("/products/**").permitAll()
+                        .requestMatchers("/categories/**").permitAll()
+                        .requestMatchers("/brands/**").permitAll()
 
-                // variants GET = público
-                .requestMatchers("/variants/**").permitAll()
+                        // variants GET = público
+                        .requestMatchers("/variants/**").permitAll()
 
-                // ----------- RUTAS PROTEGIDAS (solo POST/PUT/DELETE) -----------
-                .requestMatchers("/variants").authenticated()
-                .requestMatchers("/products").authenticated()
+                        // ----------- RUTAS PROTEGIDAS (solo POST/PUT/DELETE) -----------
+                        .requestMatchers("/variants").authenticated()
+                        .requestMatchers("/products").authenticated()
 
-                // cualquier otra ruta = requiere token
-                .anyRequest().authenticated()
-            );
+                        // cualquier otra ruta = requiere token
+                        .anyRequest().authenticated());
 
         return http.build();
     }
@@ -94,8 +98,7 @@ public class SecurityConfig {
                                 "http://localhost:3000",
                                 "http://127.0.0.1:3000",
                                 "http://10.0.2.2:3000",
-                                "*"
-                        )
+                                "*")
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                         .allowedHeaders("*")
                         .allowCredentials(false);

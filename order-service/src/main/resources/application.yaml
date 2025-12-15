@@ -29,6 +29,10 @@ logging:
   level:
     org.springframework.security: DEBUG
     org.springframework.security.oauth2: DEBUG
+    org.springdoc: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.http.converter.json: DEBUG
+
 
 app:
   security:

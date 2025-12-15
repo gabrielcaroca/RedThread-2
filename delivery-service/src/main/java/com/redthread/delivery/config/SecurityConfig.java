@@ -57,16 +57,19 @@ public class SecurityConfig {
 
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers("/actuator/health").permitAll()
+                .requestMatchers(
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/v3/api-docs/**")
+                .permitAll()
                 .requestMatchers(HttpMethod.POST, "/drivers", "/vehicles", "/zones", "/rates").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PATCH, "/drivers/**", "/vehicles/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/drivers", "/vehicles", "/zones", "/rates").hasRole("ADMIN")
-                .anyRequest().authenticated()
-        );
+                .anyRequest().authenticated());
 
         // Usa el convertidor personalizado
         http.oauth2ResourceServer(oauth -> oauth
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter()))
-        );
+                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthConverter())));
 
         return http.build();
     }
