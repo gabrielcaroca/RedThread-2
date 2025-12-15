@@ -13,10 +13,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.doAnswer
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import org.mockito.kotlin.doAnswer
 
 class CartRepositoryTest {
 
@@ -91,7 +92,7 @@ class CartRepositoryTest {
     @Test
     fun `addVariant calls ordersApi addItem with correct body`() {
         runTest {
-            whenever(ordersApi.addItem(any())).thenReturn(
+            whenever(ordersApi.addItem(any<AddItemReq>())).thenReturn(
                 CartRes(cartId = 1L, items = emptyList(), total = 0.0)
             )
 
@@ -107,14 +108,19 @@ class CartRepositoryTest {
     @Test
     fun `updateItem calls ordersApi updateItem with correct params`() {
         runTest {
-            whenever(ordersApi.updateItem(any(), any())).thenReturn(
+            whenever(
+                ordersApi.updateItem(
+                    any<Long>(),
+                    any<UpdateQtyReq>()
+                )
+            ).thenReturn(
                 CartRes(cartId = 1L, items = emptyList(), total = 0.0)
             )
 
             repo.updateItem(itemId = 9L, qty = 5)
 
             val reqCaptor = argumentCaptor<UpdateQtyReq>()
-            verify(ordersApi).updateItem(9L, reqCaptor.capture())
+            verify(ordersApi).updateItem(eq(9L), reqCaptor.capture())
             assertEquals(5, reqCaptor.firstValue.quantity)
         }
     }
@@ -122,11 +128,8 @@ class CartRepositoryTest {
     @Test
     fun `deleteItem calls ordersApi deleteItem`() {
         runTest {
-            // deleteItem retorna Unit, así que no se debe thenReturn(...)
-            doAnswer { }.whenever(ordersApi).deleteItem(any())
-
+            doAnswer { }.whenever(ordersApi).deleteItem(any<Long>())
             repo.deleteItem(12L)
-
             verify(ordersApi).deleteItem(12L)
         }
     }
@@ -134,11 +137,8 @@ class CartRepositoryTest {
     @Test
     fun `clear calls ordersApi clearCart`() {
         runTest {
-            // clearCart retorna Unit, así que no se debe thenReturn(...)
             doAnswer { }.whenever(ordersApi).clearCart()
-
             repo.clear()
-
             verify(ordersApi).clearCart()
         }
     }

@@ -134,4 +134,6 @@ dependencies {
 
     // Flow testing
     testImplementation("app.cash.turbine:turbine:1.1.0")
+    testImplementation("org.mockito:mockito-inline:5.2.0")
+
 }

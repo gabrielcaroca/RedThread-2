@@ -53,19 +53,25 @@ class ProfileViewModelTest {
 
     @Test
     fun `createAddress success adds address to list`() = runTest {
-        whenever(repo.list()).thenReturn(emptyList())
-        whenever(repo.create(any<CreateAddressRequest>())).thenReturn(
-            AddressDto(
-                id = 2L,
-                line1 = "Calle 2",
-                line2 = null,
-                city = "Santiago",
-                state = "RM",
-                zip = "0000000",
-                country = "CL",
-                default = false
-            )
+        val created = AddressDto(
+            id = 2L,
+            line1 = "Calle 2",
+            line2 = null,
+            city = "Santiago",
+            state = "RM",
+            zip = "0000000",
+            country = "CL",
+            default = false
         )
+
+        // IMPORTANTE:
+        // Si el ViewModel recarga con repo.list() después de crear, no puede seguir devolviendo emptyList()
+        whenever(repo.list()).thenReturn(
+            emptyList(),           // loadAddresses() inicial
+            listOf(created)        // recarga posterior a createAddress()
+        )
+
+        whenever(repo.create(any<CreateAddressRequest>())).thenReturn(created)
 
         val vm = ProfileViewModel(repo, authRepo)
 
