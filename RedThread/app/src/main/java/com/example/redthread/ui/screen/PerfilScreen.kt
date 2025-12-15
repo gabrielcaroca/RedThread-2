@@ -19,7 +19,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.redthread.domain.enums.UserRole
 import com.example.redthread.data.remote.dto.AddressDto
-import com.example.redthread.navigation.Route
 import com.example.redthread.ui.theme.*
 import com.example.redthread.ui.viewmodel.AuthHeaderState
 import com.example.redthread.ui.viewmodel.ProfileViewModel
@@ -156,20 +155,7 @@ fun PerfilScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            // Historial
-            Button(
-                onClick = {
-                    navController.navigate(Route.HistorialCompras.path) {
-                        launchSingleTop = true
-                        popUpTo(Route.Perfil.path) { inclusive = false }
-                    }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Ver historial de compras")
-            }
-
-            Spacer(Modifier.height(8.dp))
+            // ✅ (Quitado) Historial de compras
 
             // Logout
             Button(
@@ -182,7 +168,6 @@ fun PerfilScreen(
         }
     }
 
-    // Diálogo de dirección (✅ sin predeterminada)
     if (showDialog) {
         DialogDireccion(
             edit = editing,
@@ -195,7 +180,7 @@ fun PerfilScreen(
                         state = stateValue,
                         zip = zip,
                         country = country,
-                        isDefault = false // ✅ forzado
+                        isDefault = false
                     )
                 } else {
                     vm.updateAddress(
@@ -205,7 +190,7 @@ fun PerfilScreen(
                         state = stateValue,
                         zip = zip,
                         country = country,
-                        default = false // ✅ forzado
+                        default = false
                     )
                 }
                 showDialog = false
@@ -213,7 +198,6 @@ fun PerfilScreen(
         )
     }
 
-    // ✅ Editar perfil (nombre/correo)
     if (showEditProfile) {
         DialogEditarPerfil(
             nameInit = header.displayName ?: "",
@@ -226,7 +210,6 @@ fun PerfilScreen(
         )
     }
 
-    // ✅ Cambiar contraseña (actual + nueva)
     if (showChangePassword) {
         DialogCambiarPassword(
             onDismiss = { showChangePassword = false },

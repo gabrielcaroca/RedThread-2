@@ -56,10 +56,10 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 
-    // ===== Foundation (LazyGrid, animateItemPlacement, etc.) =====
+    // ===== Foundation =====
     implementation("androidx.compose.foundation:foundation")
 
-    // ===== Animations (AnimatedContent, Crossfade, etc.) =====
+    // ===== Animations =====
     implementation("androidx.compose.animation:animation")
 
     // ===== Material 3 =====
@@ -71,7 +71,7 @@ dependencies {
     // ===== Navigation Compose =====
     implementation("androidx.navigation:navigation-compose:2.8.0")
 
-    // ===== Lifecycle + ViewModel para Compose =====
+    // ===== Lifecycle + ViewModel =====
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.4")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.4")
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -80,67 +80,58 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 
-    // ===== Room (SQLite local) =====
+    // ===== Room =====
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
 
-    // ===== DataStore (preferencias locales) =====
+    // ===== DataStore =====
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
     // ===== Carga de imágenes =====
     implementation("io.coil-kt:coil-compose:2.7.0")
 
     // ===== SplashScreen =====
     implementation("androidx.core:core-splashscreen:1.0.1")
 
-    // ===== Material Components (para compatibilidad XML) =====
+    // ===== Material Components =====
     implementation("com.google.android.material:material:1.12.0")
 
-    // ===== Tests =====
+    // ===== Retrofit / OkHttp =====
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+
+    // ===== GPS =====
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // (tenías coil duplicado con otra versión, dejo solo una)
+    // implementation("io.coil-kt:coil-compose:2.5.0")  // <- QUITADO
+
+    // ===== Tests Instrumentados (androidTest) =====
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.09.00"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-
-    // ==== AGREGADOS PARA REST ====
-    // Retrofit base
-    implementation("com.squareup.retrofit2:retrofit:2.11.0") // <-- NUEVO
-    // Convertidor JSON con Gson
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0") // <-- NUEVO
-    // OkHttp y logging interceptor
-    implementation("com.squareup.okhttp3:okhttp:4.12.0") // <-- NUEVO
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // <-- NUEVO
-
-    //librerias de Test Locales
-     //libreria junit
-    //test implementacion UI
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
-    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-    androidTestImplementation(libs.androidx.compose.ui.test.manifest)
-    //librerias para el manejo de reglas de test
     androidTestImplementation("androidx.test:core-ktx:1.5.0")
     androidTestImplementation("androidx.test:rules:1.5.0")
-    // GPS (Fused Location Provider)
-    implementation("com.google.android.gms:play-services-location:21.3.0")
-    implementation("io.coil-kt:coil-compose:2.5.0")
+    androidTestImplementation(libs.androidx.compose.ui.test.manifest)
 
-    // ===== Tests JVM =====
+    // ===== Tests JVM (src/test) =====
     testImplementation("junit:junit:4.13.2")
+    testImplementation(kotlin("test"))
 
-// Coroutines test (OBLIGATORIO)
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    // Coroutines test (alineado con 1.8.1)
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
 
-// ViewModelScope en tests
+    // ViewModelScope en tests
     testImplementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
 
-// Mockito
+    // Mockito
     testImplementation("org.mockito:mockito-core:5.11.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
 
-// Flow testing
+    // Flow testing
     testImplementation("app.cash.turbine:turbine:1.1.0")
-
-
-
 }
